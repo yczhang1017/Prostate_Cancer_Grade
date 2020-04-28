@@ -62,8 +62,8 @@ else:
     torch.set_default_tensor_type(torch.FloatTensor)
     device = torch.device("cpu")
 
-if not os.path.exists(args.save_folder):
-    os.mkdir(args.save_folder)
+if not os.path.exists(args.output_folder):
+    os.mkdir(args.output_folder)
     
 
 nlabel = 6
