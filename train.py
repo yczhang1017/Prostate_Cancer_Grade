@@ -2,22 +2,23 @@ import os
 import argparse
 import torch
 from torch import nn
+import torch.backends.cudnn as cudnn
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import random 
 from tqdm import tqdm
-
+import zipfile
 import PIL
-os.environ['PATH'] = "C:/ProgramData/Anaconda3/lib/site-packages/openslide/bin" + ";" + os.environ['PATH']
-print(os.environ['PATH'] )
 import openslide
 import skimage.measure
 from PIL.ImageOps import invert
 
 from sklearn.model_selection import train_test_split
 from torchvision.transforms import transforms
-from torch.utils.data import Dataset, DataLoader, RandomSampler
+from torch.utils.data import Dataset, DataLoader
+import torch.optim as optim
 
 from efficientnet_pytorch import EfficientNet
 from torch_multi_head_attention import MultiHeadAttention
@@ -49,6 +50,9 @@ parser.add_argument('-r','--resume_epoch', default=0, type=int,
                     help='epoch number to be resumed at')
 parser.add_argument('-s','--size', default=256, type=int,
                     help='image size for training')
+parser.add_argument('-ls','--log_step', default=1, type=int,
+                    help='number of steps to print log')
+
 
 args = parser.parse_args()
 if torch.cuda.is_available():
@@ -61,6 +65,24 @@ else:
 if not os.path.exists(args.save_folder):
     os.mkdir(args.save_folder)
     
+
+nlabel = 6
+transform = {}
+transform['train'] = transforms.Compose([
+     transforms.RandomVerticalFlip(),
+     transforms.RandomHorizontalFlip(),
+     transforms.ToTensor(),
+     transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                          std=[0.229, 0.224, 0.225]),
+     ])
+transform['val'] = transforms.Compose([
+     transforms.ToTensor(),
+     transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                          std=[0.229, 0.224, 0.225]),
+     ])
+transform['test'] = transform['vali'] 
+
+
 def getp1(img):
     h,w = img.shape
     for i in range(h):
@@ -73,14 +95,7 @@ def getp2(img):
         for j in range(w-1,-1,-1):
             if img[i,:].mean()>0 or img[:,j].mean()>0: 
                 return i,j
-            
-transform = transforms.Compose([
-     transforms.RandomVerticalFlip(),
-     transforms.RandomHorizontalFlip(),
-     transforms.ToTensor(),
-     transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                          std=[0.229, 0.224, 0.225]),
-     ])
+
 
 '''
 extract_images("001c62abd11fa4b57bf7a6c603a11bb9",
@@ -88,9 +103,9 @@ extract_images("001c62abd11fa4b57bf7a6c603a11bb9",
     256,
     False)
 '''            
-def extract_images(img_id,img_dir,size,debug):
-    img_path = os.path.join(img_dir, img_id+'.tiff')
-    image = openslide.OpenSlide(img_path)
+def extract_images(img_id, archive, size, debug):
+    f = archive.open('train_images/'+img_id+'.tiff')
+    image = openslide.OpenSlide(f)
     w0,h0 = image.level_dimensions[0]
     out = size
     s1 = size
@@ -143,8 +158,8 @@ def extract_images(img_id,img_dir,size,debug):
     return images
 
 class ProstateData(Dataset):
-    def __init__(self, df, image_dir, mode, size, transform):
-        self.img_dir = image_dir
+    def __init__(self, df, archive, mode, size, transform):
+        self.archive = archive
         self.size = size
         self.mode = mode
         self.transform = transform
@@ -155,7 +170,7 @@ class ProstateData(Dataset):
     def __getitem__(self, idx):
         img_id = self.df.iloc[idx].image_id
         label = self.df.iloc[idx].isup_grade
-        images = extract_images(img_id, self.img_dir, self.size, False)
+        images = extract_images(img_id, self.archive, self.size, False)
         image_tensor = None
         for im in images:
             tensor = self.transform(im).unsqueeze(0)
@@ -171,7 +186,7 @@ class ProstateData(Dataset):
 
 
 class Grader(nn.Module):
-    def __init__(self, n = 64, o=6):
+    def __init__(self, n = 64, o=nlabel):
         super(Grader, self).__init__()
         self.n = n
         self.models = [EfficientNet.from_pretrained('efficientnet-b0'),
@@ -213,91 +228,79 @@ class Grader(nn.Module):
     
 
 
-def train(model,
-    lr = 0.1,
-    momentum = 0.9,
-    weight_decay = 1e-4,
-    start = 0 ,
-    end = 15,
-    batch_size = 1,
-    checkpoint = None,
-    size =256,
-    num_workers = 4,
-    use_tpu = False,
-    data_dir = "/kaggle/input/prostate-cancer-grade-assessment/",
-    log_steps =1,
-):
     
-    data, pred, target = None, None, None
-    for i in range(start): 
+ 
+def main():
+    
+    archive = zipfile.ZipFile(os.path.join(
+        args.root,'prostate-cancer-grade-assessment.zip'), 'r')
+    train_csv = pd.read_csv(archive.open("train.csv"))
+    df = {}
+    df['train'], df['val'] = train_test_split(train_csv, test_size=0.05, random_state=42)
+    dataset = {x: ProstateData(df[x], archive, x, 256, transform=transform[x]) 
+                for x in ['train', 'val']}
+    loader={x: DataLoader(dataset[x],
+                          batch_size=args.batch_size, 
+                          shuffle= (x=='Train'),
+                          num_workers=args.workers,
+                          pin_memory=True)
+                  for x in ['train', 'val']}
+    
+    model = Grader()
+    if torch.cuda.is_available():
+        model=nn.DataParallel(model)
+        cudnn.benchmark = True
+        
+    if args.checkpoint:
+        print('Resuming training from epoch {}, loading {}...'
+              .format(args.resume_epoch,args.checkpoint))
+        weight_file=os.path.join(args.root,args.checkpoint)
+        model.load_state_dict(torch.load(weight_file,
+                                 map_location=lambda storage, loc: storage))
+    
+    model.to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=0.1)
+    #scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10], gamma=0.1)
+    #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer)
+    for i in range(args.resume_epoch):
         scheduler.step()
-    for epoch in tqdm(range(start,end), desc="Epoch", disable=disable_logging):
+    
+    for epoch in tqdm(range(args.resume_epoch, args.epoch), desc="Epoch"):
         for phase in ['train','val']:
             if phase == 'train':
-                loader = pl.ParallelLoader(train_loader, [device]) if use_tpu else train_loader
                 model.train()
                 scheduler.step()
             else:
-                loader = pl.ParallelLoader(test_loader, [device]) if use_tpu else test_loader
                 model.eval()
-            iterator = tqdm(loader, desc=phase, total=len(loader), disable=disable_logging)
-            total_samples = 0
-            correct = 0
-            with torch.set_grad_enabled(phase == 'train'):
-                for i, (inputs, target) in enumerate(iterator):
-                    optimizer.zero_grad()
+            iterator = tqdm(loader[phase], desc=phase, total=len(loader))
+            num = 0
+            correct = np.zeros(6)
+            running_loss=0
+            for i, (inputs, targets) in enumerate(iterator):
+                inputs = inputs.to(device)                
+                targets= targets.to(device)
+                optimizer.zero_grad()
+                with torch.set_grad_enabled(phase == 'train'):
                     output = model(inputs)
-                    loss = criterion(output, target)
+                    loss = criterion(output, targets)
                     loss.backward()
                     if phase == 'train':
-                        if use_tpu:
-                            xm.optimizer_step(optimizer)
-                        else:
-                            optimizer.step()
-                        scheduler.step()
-            
-                    pred = output.max(1, keepdim=True)[1]
-                    correct += pred.eq(target.view_as(pred)).sum().item()
-                    total_samples += inputs.size()[0]
-                    accuracy = 100.0 * correct / total_samples
-                    if i % log_steps == 0:
-                        print('({}) Loss:{:.3f} Acc:{:.3f}'.format(
-                             total_samples, loss.item(), accuracy)) #xm.get_ordinal()
+                        loss.backward()
+                        optimizer.step()
+                    
+                    num += inputs.size(0)
+                    pred = output.argmax(dim=1, keepdim=True)
+                    #pred = output.max(1, keepdim=True)[1]
+                    correct += pred.eq(targets.view_as(pred)).sum(0).cpu().numpy()
+                    running_loss += loss.item() * inputs.size(0)
+                    accuracy = 100.0 * correct / num
+                    if i % args.log_step == 0:
+                        s = "({}) Loss:{:.3f} Acc:" + "{:.3f}|"*6
+                        print(s.format(num, running_loss,*accuracy))
             if epoch % 5 == 0:
                 torch.save(model.state_dict(), "checkpoint-{}.pth".format(epoch))
- 
-def main():
-    #data_dir = "/kaggle/input/prostate-cancer-grade-assessment/"    
-    data_dir = "data"
-    train_csv = pd.read_csv(os.path.join(data_dir,"train.csv"))
-    train_df, vali_df = train_test_split(train_csv, test_size=0.05, random_state=42)
-    train_dir = os.path.join(data_dir,"train_images")
-    dataset = {'train': ProstateData(train_df, train_dir, 'train', 256, transform),
-               'vali': ProstateData(vali_df, train_dir, 'vali', 256, transform)}
-    train_sampler = RandomSampler(dataset['train'])
-    train_loader = DataLoader(
-        dataset['train'],
-        batch_size=batch_size,
-        sampler=train_sampler,
-        num_workers=num_workers,
-        drop_last=True)
-    vali_loader = DataLoader(
-        dataset['vali'],
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        drop_last=True)
-    model.to(device)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr,
-                            momentum=momentum,
-                            weight_decay=weight_decay)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10], gamma=0.1)
-    #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer)
-    accuracy = 0.0
-    model = Grader() 
-    train(model)    
-
 
 if __name__ == '__main__':
     main()
