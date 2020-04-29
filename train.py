@@ -3,12 +3,11 @@ import argparse
 import torch
 from torch import nn
 import torch.backends.cudnn as cudnn
-
+import time
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import random 
-from tqdm import tqdm
 import PIL
 import openslide
 import skimage.measure
@@ -54,7 +53,7 @@ parser.add_argument('-r','--resume_epoch', default=0, type=int,
                     help='epoch number to be resumed at')
 parser.add_argument('-s','--size', default=256, type=int,
                     help='image size for training')
-parser.add_argument('-ls','--log_step', default=1, type=int,
+parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
 parser.add_argument('--step', default=5, type=int,
                     help='step to reduce lr')
@@ -280,17 +279,18 @@ def main():
     for i in range(args.resume_epoch):
         scheduler.step()
     
-    for epoch in tqdm(range(args.resume_epoch, args.epochs), desc="Epoch"):
+    for epoch in range(args.resume_epoch, args.epochs):
         for phase in ['train','val']:
+            t0 = time.time()
+            print("=========",phase,"=========")
             if phase == 'train':
                 model.train()
             else:
                 model.eval()
-            iterator = tqdm(loader[phase], desc=phase, total=len(loader))
             num = 0
             correct = np.zeros(6)
             running_loss=0
-            for i, (inputs, targets) in enumerate(iterator):
+            for i, (inputs, targets) in loader[phase]:
                 inputs = inputs.to(device)                
                 targets= targets.to(device)
                 optimizer.zero_grad()
@@ -308,11 +308,12 @@ def main():
                     running_loss += loss.item() * inputs.size(0)
                     accuracy = 100.0 * correct / num
                     if i % args.log_step == 0:
-                        s = "({}) Loss:{:.3f} Acc:" + "{:.3f}|"*6
-                        print(s.format(num, running_loss,*accuracy))
+                        s = "({},{:.1f}s) Loss:{:.3f} Acc:" + "|".join(["{:.3f}"]*6)
+                        print(s.format(num, (time.time()-t0)/i, running_loss/num,*accuracy))
             if phase=="train":scheduler.step()
             if epoch % 5 == 0:
-                torch.save(model.state_dict(), "checkpoint-{}.pth".format(epoch))
+                torch.save(model.state_dict(), 
+                           os.path.join(args.output_folder,"checkpoint-{}.pth".format(epoch)))
 
 if __name__ == '__main__':
     main()
