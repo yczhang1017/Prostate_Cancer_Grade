@@ -281,7 +281,10 @@ def main():
                     output = model(inputs)
                     loss = criterion(output, targets)
                     if phase == 'train':
-                        loss.backward()
+                        if args.fp16:
+                            optimizer.backward(loss)
+                        else:
+                            loss.backward()
                         optimizer.step()
                     
                     num += inputs.size(0)
