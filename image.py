@@ -41,6 +41,7 @@ for level, n in num.items():
     random.shuffle(ll)
     ll = ll[:n]
     pts = [(x,y) for x,y in zip(xs[ll],ys[ll])]
+    print(pts)
     for x,y in pts:
         s0 = max(w0,h0)
         ix,iy = x*s0//level , y*s0//level
