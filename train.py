@@ -100,8 +100,19 @@ def getp2(img):
         for j in range(w-1,-1,-1):
             if img[i,:].mean()>0 or img[:,j].mean()>0: 
                 return i,j
+def argmax2d(X):
+    n, m = X.shape
+    x_ = np.ravel(X)
+    i,j = np.unravel_index(x_.argmax(), X.shape)
+    return i, j
 
-
+def topk(array, n):
+    x = np.zeros(n, dtype=int)
+    y = np.zeros(n, dtype=int)
+    for i in range(n):
+        x[i], y[i]= argmax2d(array)
+        array[x[i], y[i]] = 0
+    return x, y
 '''
 extract_images("001c62abd11fa4b57bf7a6c603a11bb9",
     "/kaggle/input/prostate-cancer-grade-assessment/train_images",
@@ -139,16 +150,16 @@ def extract_images(img_id, img_dir, size, debug):
     for level, n in num.items():
         r = out // level
         label = skimage.measure.block_reduce(img, (r,r), np.mean)
-        label = label > 20
         if debug:
             plt.figure()
             plt.imshow(label*255)
 
-        xs,ys = label.nonzero()
-        pts = [(x,y) for x,y in zip(xs,ys)]
-        random.shuffle(pts)
-        for j in range(n):
-            x,y = pts[j]
+        xs,ys = topk(label,12)
+        ll=list(range(12))
+        random.shuffle(ll)
+        ll = ll[:n]
+        pts = [(x,y) for x,y in zip(xs[ll],ys[ll])]
+        for x,y in pts:
             s0 = max(w0,h0)
             ix,iy = x*s0//level , y*s0//level
             im = image.read_region((iy,ix), 0, (s0//level,s0//level))        
