@@ -255,7 +255,9 @@ def main():
             else:
                 model.eval()
             num = 0
-            correct = np.zeros(6)
+            correct = 0
+            nums = np.zeros(6,dtype=int)
+            corrects = np.zeros(6,dtype=int)
             running_loss=0
             for i, (inputs, targets) in enumerate(loader[phase]):
                 inputs = inputs.to(device)                
@@ -273,12 +275,22 @@ def main():
                     #pred = output.max(1, keepdim=True)[1]
                     correct += pred.eq(targets).sum().item()
                     running_loss += loss.item() * inputs.size(0)
-                    accuracy = 100.0 * correct / num
+                    acc = 100.0 * correct / num
                     if (i+1) % args.log_step == 0:
-                        s = "({},{:.1f}s) Loss:{:.3f} Acc:" + "|".join(["{:.3f}"]*6)
-                        print(s.format(num, (time.time()-t0)/(i+1), running_loss/num,*accuracy))
+                        s = "({},{:.1f}s) Loss:{:.3f} Acc:{:.3f}" 
+                        print(s.format(num, (time.time()-t0)/(i+1), running_loss/num, acc))
+                    
+                    if phase == 'val':
+                        s=""
+                        for i in range(nlabel):
+                            t = targets.eq(i)
+                            nums[i] += t.sum().item()
+                            corrects[i] = (pred.eq(i)&t).sum().item()
+                            s+= "{}/{} |".format(nums[i],corrects[i])
+                        print(s)
+                        
             if phase=="train":scheduler.step()
-            if epoch % 5 == 0:
+            if epoch % 5 == 0 and phase=="train":
                 torch.save(model.state_dict(), 
                            os.path.join(args.output_folder,"checkpoint-{}.pth".format(epoch)))
 
