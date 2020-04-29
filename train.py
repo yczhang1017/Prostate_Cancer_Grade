@@ -58,7 +58,8 @@ parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
 parser.add_argument('--step', default=5, type=int,
                     help='step to reduce lr')
-
+parser.add_argument('--fp16', default=True, type=str2bool,
+                    help='use half precision or not')
 args = parser.parse_args()
 if torch.cuda.is_available():
     torch.set_default_tensor_type(torch.cuda.FloatTensor)
@@ -238,6 +239,11 @@ def main():
                                  map_location=lambda storage, loc: storage))
     
     model.to(device)
+    if args.fp16:
+        model.half()
+        for layer in model.modules():
+            if isinstance(layer, nn.BatchNorm2d):
+                layer.float()
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
@@ -260,7 +266,7 @@ def main():
             corrects = np.zeros(6,dtype=int)
             running_loss=0
             for i, (inputs, targets) in enumerate(loader[phase]):
-                inputs = inputs.to(device)                
+                inputs = inputs.to(device).half() if args.fp16 else inputs.to(device)                 
                 targets= targets.to(device)
                 optimizer.zero_grad()
                 with torch.set_grad_enabled(phase == 'train'):
