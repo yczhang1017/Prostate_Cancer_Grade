@@ -40,7 +40,7 @@ parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
 parser.add_argument('--cuda', default=True, type=str2bool,
                     help='Use CUDA to train model')
-parser.add_argument('--lr', default=0.01, type=float,
+parser.add_argument('--lr', default=0.05, type=float,
                     help='initial learning rate')
 parser.add_argument('-e','--epochs', default=15, type=int,
                     help='number of epochs to train')
@@ -290,7 +290,7 @@ def main():
                         print(s)
                         
             if phase=="train":scheduler.step()
-            if epoch % 5 == 0 and phase=="train":
+            if epoch % 1 == 0 and phase=="train":
                 torch.save(model.state_dict(), 
                            os.path.join(args.output_folder,"checkpoint-{}.pth".format(epoch)))
 
