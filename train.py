@@ -174,13 +174,12 @@ class Grader(nn.Module):
         self.n = n
         self.model = EfficientNet.from_pretrained('efficientnet-b1')
         self.fc1 = nn.Linear(1000,n*3)
-        
         self.attention = MultiHeadAttention(in_features=n, head_num=8)
         self.fc2 = nn.Linear(n,o)
     def forward(self,x,size=args.size): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
-        x = x.view(b*17, c, w, h)
-        x = self.fc1(self.model(x))
+        x = self.model(x.view(b*17, c, w, h))
+        x = self.fc1(x).view(b,17,3*self.n)
         q = x[b,17,:self.n]
         k = x[b,17,self.n:2*self.n]
         v = x[b,17,2*self.n:3*self.n]
