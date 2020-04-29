@@ -16,3 +16,7 @@ sudo apt-get install openslide-tools
 pip install openslide-python
 pip install efficientnet_pytorch
 pip install torch-multi-head-attention
+
+##run 
+nohup python3 -u train.py --checkpoint 'save/out_1.pth' --resume_epoch 1 > aa.log </dev/null 2>&1&
+echo $! > pid.txt

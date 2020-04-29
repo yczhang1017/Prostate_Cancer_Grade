@@ -290,7 +290,7 @@ def main():
             num = 0
             correct = np.zeros(6)
             running_loss=0
-            for i, (inputs, targets) in loader[phase]:
+            for i, (inputs, targets) in enumerate(loader[phase]):
                 inputs = inputs.to(device)                
                 targets= targets.to(device)
                 optimizer.zero_grad()
