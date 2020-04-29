@@ -86,31 +86,14 @@ transform['val'] = transforms.Compose([
      ])
 transform['test'] = transform['val'] 
 
-
-def getp1(img):
-    h,w = img.shape
-    for i in range(h):
-        for j in range(w):
-            if img[i,:].mean()>0 or img[:,j].mean()>0: 
-                return j,i
-def getp2(img):
-    h,w = img.shape
-    for i in range(h-1,-1,-1):
-        for j in range(w-1,-1,-1):
-            if img[i,:].mean()>0 or img[:,j].mean()>0: 
-                return i,j
-def argmax2d(X):
-    n, m = X.shape
-    x_ = np.ravel(X)
-    i,j = np.unravel_index(x_.argmax(), X.shape)
-    return i, j
-
-def topk(array, n):
+def topk(X, n):
     x = np.zeros(n, dtype=int)
     y = np.zeros(n, dtype=int)
+    x_ = np.ravel(X)
     for i in range(n):
-        x[i], y[i]= argmax2d(array)
-        array[x[i], y[i]] = 0
+        ij = x_.argmax()
+        x_[ij] = 0
+        x[i], y[i] = np.unravel_index(ij, X.shape)
     return x, y
 '''
 extract_images("001c62abd11fa4b57bf7a6c603a11bb9",
@@ -122,32 +105,12 @@ def extract_images(img_id, img_dir, size, debug):
     image_path = os.path.join(img_dir, img_id + '.tiff')
     image = openslide.OpenSlide(image_path)
     w0,h0 = image.level_dimensions[0]
-    out = size
-    s1 = size
-    thumbnail = image.get_thumbnail((s1,s1))
-    img = np.array(thumbnail)
-    img = 255 - img.mean(axis=2)
-    
-    i1,j1=getp1(img)
-    i2,j2=getp2(img)
-    box1 = np.array([j1,i1,j2,i2]) 
-    h1,w1=img.shape   #size before crop
-    h2,w2=i2-i1,j2-j1 #size after crop
-
-    s3 = s1*out//max(w2,h2)
-    box3 = box1*out//max(w2,h2)
-    im1 = image.get_thumbnail((s3,s3)).crop(box3)
-    w3, h3 = im1.size
-    x = random.randrange(out-w3) if w3<out else 0
-    y = random.randrange(out-h3) if h3<out else 0
-    im = PIL.Image.new("RGB", (out,out), (0,0,0))
-    im.paste(invert(im1), box = (x,y))
-    
-    
+    im = invert(image.get_thumbnail((size,size)))    
+    img = np.array(im)
     num =  {16:8, 64:8}
     images = [im]
     for level, n in num.items():
-        r = out // level
+        r = size // level
         label = skimage.measure.block_reduce(img, (r,r), np.mean)
         if debug:
             plt.figure()
@@ -162,7 +125,7 @@ def extract_images(img_id, img_dir, size, debug):
             s0 = max(w0,h0)
             ix,iy = x*s0//level , y*s0//level
             im = image.read_region((iy,ix), 0, (s0//level,s0//level))        
-            im = invert(im.resize((out,out)).convert('RGB'))
+            im = invert(im.resize((size,size)).convert('RGB'))
             images += [im]
 
     if debug:
