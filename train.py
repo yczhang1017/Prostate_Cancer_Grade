@@ -33,7 +33,7 @@ parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
 parser.add_argument('--root', default='..',
                     type=str, help='directory of the data')
-parser.add_argument('--batch_size', default=6, type=int,
+parser.add_argument('--batch_size', default=8, type=int,
                     help='Batch size for training')
 parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
@@ -51,7 +51,7 @@ parser.add_argument('-c','--checkpoint', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('-r','--resume_epoch', default=0, type=int,
                     help='epoch number to be resumed at')
-parser.add_argument('-s','--size', default=256, type=int,
+parser.add_argument('-s','--size', default=224, type=int,
                     help='image size for training')
 parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
@@ -171,8 +171,8 @@ class Grader(nn.Module):
         super(Grader, self).__init__()
         self.n = n
         self.models = [EfficientNet.from_pretrained('efficientnet-b0'),
-                  EfficientNet.from_pretrained('efficientnet-b0'),
-                  EfficientNet.from_pretrained('efficientnet-b0'),]
+                  EfficientNet.from_pretrained('efficientnet-b1'),
+                  EfficientNet.from_pretrained('efficientnet-b1'),]
         self.fcq = [nn.Linear(1000,n),
                     nn.Linear(1000,n),
                     nn.Linear(1000,n)]
@@ -185,7 +185,7 @@ class Grader(nn.Module):
         
         self.attention = MultiHeadAttention(in_features=n, head_num=8)
         self.fc1 = nn.Linear(n,o)
-    def forward(self,x,size=256): # batch x 17 x size x size x 3
+    def forward(self,x,size=args.size): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         xs = [x[:,0,:,:,:],
               x[:,1:9,:,:,:].reshape(b*8, c, w, h),
@@ -215,7 +215,7 @@ def main():
     train_csv = pd.read_csv(os.path.join(args.root, "train.csv"))
     df = {}
     df['train'], df['val'] = train_test_split(train_csv, test_size=0.05, random_state=42)
-    dataset = {x: ProstateData(df[x], args.root, x, 256, transform=transform[x]) 
+    dataset = {x: ProstateData(df[x], args.root, x, args.size, transform=transform[x]) 
                 for x in ['train', 'val']}
     loader={x: DataLoader(dataset[x],
                           batch_size=args.batch_size, 
