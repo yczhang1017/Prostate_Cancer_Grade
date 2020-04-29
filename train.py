@@ -8,7 +8,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import random 
-import PIL
 import openslide
 import skimage.measure
 from PIL.ImageOps import invert
@@ -106,7 +105,7 @@ def extract_images(img_id, img_dir, size, debug):
     image = openslide.OpenSlide(image_path)
     w0,h0 = image.level_dimensions[0]
     im = invert(image.get_thumbnail((size,size)))    
-    img = np.array(im)
+    img = np.array(im).mean(2)
     num =  {16:8, 64:8}
     images = [im]
     for level, n in num.items():
