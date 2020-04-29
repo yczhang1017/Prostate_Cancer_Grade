@@ -55,17 +55,8 @@ parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
 parser.add_argument('--step', default=5, type=int,
                     help='step to reduce lr')
-parser.add_argument('--fp16', action='store_false',
-                    help='Run model fp16 mode.')
 
 args = parser.parse_args()
-
-
-if args.fp16 or args.distributed:
-    try:
-        from apex.fp16_utils import network_to_half,FP16_Optimizer
-    except ImportError:
-        raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
 
 
 
@@ -243,16 +234,8 @@ def main():
                                  map_location=lambda storage, loc: storage))
     
     model.to(device)
-    
-    
-    if args.fp16:
-        assert torch.backends.cudnn.enabled, "fp16 mode requires cudnn backend to be enabled."
-        model = network_to_half(model)
-        
     criterion = nn.CrossEntropyLoss().cuda()
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
-    if args.fp16:
-        optimizer = FP16_Optimizer(optimizer)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
     
     #scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10], gamma=0.1)
@@ -274,17 +257,14 @@ def main():
             corrects = np.zeros(6,dtype=int)
             running_loss=0
             for i, (inputs, targets) in enumerate(loader[phase]):
-                inputs = inputs.to(device).half() if args.fp16 else inputs.to(device)                 
+                inputs = inputs.to(device)                
                 targets= targets.to(device)
                 optimizer.zero_grad()
                 with torch.set_grad_enabled(phase == 'train'):
                     output = model(inputs)
                     loss = criterion(output, targets)
                     if phase == 'train':
-                        if args.fp16:
-                            optimizer.backward(loss)
-                        else:
-                            loss.backward()
+                        loss.backward()
                         optimizer.step()
                     
                     num += inputs.size(0)
