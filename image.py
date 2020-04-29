@@ -18,7 +18,7 @@ def topk(X, n):
     return x, y
 
 
-size = 224
+size = 192
 img_id = "001c62abd11fa4b57bf7a6c603a11bb9"
 image_path = os.path.join("../train_images", img_id + '.tiff')
 image = openslide.OpenSlide(image_path)
