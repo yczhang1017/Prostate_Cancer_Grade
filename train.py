@@ -22,14 +22,13 @@ import torch.optim as optim
 from efficientnet_pytorch import EfficientNet
 from torch_multi_head_attention import MultiHeadAttention
 
+    
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
 set_seed(42)
 
-def str2bool(v):
-    return v.lower() in ("yes", "true", "t", "1")
 parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
 parser.add_argument('--root', default='..',
@@ -38,8 +37,6 @@ parser.add_argument('--batch_size', default=8, type=int,
                     help='Batch size for training')
 parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
-parser.add_argument('--cuda', default=True, type=str2bool,
-                    help='Use CUDA to train model')
 parser.add_argument('--lr', default=0.01, type=float,
                     help='initial learning rate')
 parser.add_argument('-e','--epochs', default=15, type=int,
@@ -58,14 +55,25 @@ parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
 parser.add_argument('--step', default=5, type=int,
                     help='step to reduce lr')
-parser.add_argument('--fp16', default=True, type=str2bool,
-                    help='use half precision or not')
+parser.add_argument('--fp16', action='store_false',
+                    help='Run model fp16 mode.')
+
 args = parser.parse_args()
+
+
+if args.fp16 or args.distributed:
+    try:
+        from apex.fp16_utils import network_to_half,FP16_Optimizer
+    except ImportError:
+        raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
+
+
+
 if torch.cuda.is_available():
-    torch.set_default_tensor_type(torch.cuda.FloatTensor)
     device = torch.device("cuda:0")
+    torch.cuda.set_device(device)
+    cudnn.benchmark = True
 else:
-    torch.set_default_tensor_type(torch.FloatTensor)
     device = torch.device("cpu")
 
 if not os.path.exists(args.output_folder):
@@ -209,10 +217,6 @@ class Grader(nn.Module):
         y = self.fc1(y).mean(dim=1)
         return y
     
-
-
-    
- 
 def main():
     train_csv = pd.read_csv(os.path.join(args.root, "train.csv"))
     df = {}
@@ -229,7 +233,7 @@ def main():
     model = Grader()
     if torch.cuda.is_available():
         model=nn.DataParallel(model)
-        cudnn.benchmark = True
+        
         
     if args.checkpoint:
         print('Resuming training from epoch {}, loading {}...'
@@ -239,14 +243,18 @@ def main():
                                  map_location=lambda storage, loc: storage))
     
     model.to(device)
+    
+    
     if args.fp16:
-        model.half()
-        for layer in model.modules():
-            if isinstance(layer, nn.BatchNorm2d):
-                layer.float()
-    criterion = nn.CrossEntropyLoss()
+        assert torch.backends.cudnn.enabled, "fp16 mode requires cudnn backend to be enabled."
+        model = network_to_half(model)
+        
+    criterion = nn.CrossEntropyLoss().cuda()
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+    if args.fp16:
+        optimizer = FP16_Optimizer(optimizer)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
+    
     #scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10], gamma=0.1)
     #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer)
     for i in range(args.resume_epoch):
