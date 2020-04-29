@@ -33,7 +33,7 @@ parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
 parser.add_argument('--root', default='..',
                     type=str, help='directory of the data')
-parser.add_argument('--batch_size', default=4, type=int,
+parser.add_argument('--batch_size', default=6, type=int,
                     help='Batch size for training')
 parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
@@ -270,7 +270,7 @@ def main():
                     num += inputs.size(0)
                     pred = output.argmax(dim=1)
                     #pred = output.max(1, keepdim=True)[1]
-                    correct += pred.eq(pred).sum().item()
+                    correct += pred.eq(targets).sum().item()
                     running_loss += loss.item() * inputs.size(0)
                     accuracy = 100.0 * correct / num
                     if (i+1) % args.log_step == 0:
