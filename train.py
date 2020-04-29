@@ -302,9 +302,9 @@ def main():
                         optimizer.step()
                     
                     num += inputs.size(0)
-                    pred = output.argmax(dim=1, keepdim=True)
+                    pred = output.argmax(dim=1)
                     #pred = output.max(1, keepdim=True)[1]
-                    correct += pred.eq(targets.view_as(pred)).sum(0).cpu().numpy()
+                    correct += pred.eq(pred).sum().item()
                     running_loss += loss.item() * inputs.size(0)
                     accuracy = 100.0 * correct / num
                     if (i+1) % args.log_step == 0:
