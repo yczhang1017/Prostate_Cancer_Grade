@@ -163,8 +163,8 @@ def extract_images(img_id, img_dir, size, debug):
     return images
 
 class ProstateData(Dataset):
-    def __init__(self, df, img_dir, mode, size, transform):
-        self.img_dir = img_dir
+    def __init__(self, df, data_dir, mode, size, transform):
+        self.img_dir = os.path.join(data_dir,"train_images")
         self.size = size
         self.mode = mode
         self.transform = transform
@@ -185,7 +185,7 @@ class ProstateData(Dataset):
                 image_tensor = torch.cat((image_tensor, tensor), dim=0)
             
         if self.mode == 'train' or self.mode == 'val':
-            return image_tensor, torch.tensor(label, dtype=torch.long)
+            return image_tensor, torch.tensor(label, dtype=torch.long, device="cpu")
         else:
             return image_tensor
 
@@ -212,11 +212,11 @@ class Grader(nn.Module):
     def forward(self,x,size=256): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         xs = [x[:,0,:,:,:],
-              x[:,1:9,:,:,:].view(b*8, c, w, h),
-              x[:,9:,:,:,:].view(b*8, c, w, h)]
+              x[:,1:9,:,:,:].reshape(b*8, c, w, h),
+              x[:,9:,:,:,:].reshape(b*8, c, w, h)]
         q = None
         for x,m,fq,fk,fv in zip(xs, self.models, self.fcq, self.fck, self.fcv):
-            y0 = m(x).view(b, -1, 1000)
+            y0 = m(x).reshape(b, -1, 1000)
             if q is None:
                 q = fq(y0)
                 k = fk(y0)
@@ -273,7 +273,6 @@ def main():
         for phase in ['train','val']:
             if phase == 'train':
                 model.train()
-                scheduler.step()
             else:
                 model.eval()
             iterator = tqdm(loader[phase], desc=phase, total=len(loader))
@@ -287,7 +286,6 @@ def main():
                 with torch.set_grad_enabled(phase == 'train'):
                     output = model(inputs)
                     loss = criterion(output, targets)
-                    loss.backward()
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
@@ -301,6 +299,7 @@ def main():
                     if i % args.log_step == 0:
                         s = "({}) Loss:{:.3f} Acc:" + "{:.3f}|"*6
                         print(s.format(num, running_loss,*accuracy))
+            if phase=="train":scheduler.step()
             if epoch % 5 == 0:
                 torch.save(model.state_dict(), "checkpoint-{}.pth".format(epoch))
 
