@@ -307,9 +307,9 @@ def main():
                     correct += pred.eq(targets.view_as(pred)).sum(0).cpu().numpy()
                     running_loss += loss.item() * inputs.size(0)
                     accuracy = 100.0 * correct / num
-                    if i % args.log_step == 0:
+                    if (i+1) % args.log_step == 0:
                         s = "({},{:.1f}s) Loss:{:.3f} Acc:" + "|".join(["{:.3f}"]*6)
-                        print(s.format(num, (time.time()-t0)/i, running_loss/num,*accuracy))
+                        print(s.format(num, (time.time()-t0)/(i+1), running_loss/num,*accuracy))
             if phase=="train":scheduler.step()
             if epoch % 5 == 0:
                 torch.save(model.state_dict(), 
