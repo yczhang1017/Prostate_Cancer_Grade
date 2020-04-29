@@ -36,7 +36,7 @@ parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
 parser.add_argument('--cuda', default=True, type=str2bool,
                     help='Use CUDA to train model')
-parser.add_argument('-lr', '--learning-rate', default=0.01, type=float,
+parser.add_argument('--lr', default=0.01, type=float,
                     help='initial learning rate')
 parser.add_argument('-e','--epochs', default=15, type=int,
                     help='number of epochs to train')
@@ -52,7 +52,8 @@ parser.add_argument('-s','--size', default=256, type=int,
                     help='image size for training')
 parser.add_argument('-ls','--log_step', default=1, type=int,
                     help='number of steps to print log')
-
+parser.add_argument('--step', default=5, type=int,
+                    help='step to reduce lr')
 
 args = parser.parse_args()
 if torch.cuda.is_available():
@@ -80,7 +81,7 @@ transform['val'] = transforms.Compose([
      transforms.Normalize(mean=[0.485, 0.456, 0.406],
                           std=[0.229, 0.224, 0.225]),
      ])
-transform['test'] = transform['vali'] 
+transform['test'] = transform['val'] 
 
 
 def getp1(img):
@@ -179,7 +180,7 @@ class ProstateData(Dataset):
             else:
                 image_tensor = torch.cat((image_tensor, tensor), dim=0)
             
-        if self.mode == 'train' or self.mode == 'valid':
+        if self.mode == 'train' or self.mode == 'val':
             return image_tensor, torch.tensor(label, dtype=torch.long)
         else:
             return image_tensor
@@ -267,7 +268,7 @@ def main():
     for i in range(args.resume_epoch):
         scheduler.step()
     
-    for epoch in tqdm(range(args.resume_epoch, args.epoch), desc="Epoch"):
+    for epoch in tqdm(range(args.resume_epoch, args.epochs), desc="Epoch"):
         for phase in ['train','val']:
             if phase == 'train':
                 model.train()
