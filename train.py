@@ -9,7 +9,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random 
 from tqdm import tqdm
-import zipfile
 import PIL
 import openslide
 import skimage.measure
@@ -28,7 +27,7 @@ def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
 parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
-parser.add_argument('--root', default='./',
+parser.add_argument('--root', default='..',
                     type=str, help='directory of the data')
 parser.add_argument('--batch_size', default=4, type=int,
                     help='Batch size for training')
@@ -104,9 +103,9 @@ extract_images("001c62abd11fa4b57bf7a6c603a11bb9",
     256,
     False)
 '''            
-def extract_images(img_id, archive, size, debug):
-    f = archive.open('train_images/'+img_id+'.tiff')
-    image = openslide.OpenSlide(f)
+def extract_images(img_id, img_dir, size, debug):
+    image_path = os.path.join(img_dir, img_id + '.tiff')
+    image = openslide.OpenSlide(image_path)
     w0,h0 = image.level_dimensions[0]
     out = size
     s1 = size
@@ -159,8 +158,8 @@ def extract_images(img_id, archive, size, debug):
     return images
 
 class ProstateData(Dataset):
-    def __init__(self, df, archive, mode, size, transform):
-        self.archive = archive
+    def __init__(self, df, img_dir, mode, size, transform):
+        self.img_dir = img_dir
         self.size = size
         self.mode = mode
         self.transform = transform
@@ -171,7 +170,7 @@ class ProstateData(Dataset):
     def __getitem__(self, idx):
         img_id = self.df.iloc[idx].image_id
         label = self.df.iloc[idx].isup_grade
-        images = extract_images(img_id, self.archive, self.size, False)
+        images = extract_images(img_id, self.img_dir, self.size, False)
         image_tensor = None
         for im in images:
             tensor = self.transform(im).unsqueeze(0)
@@ -232,13 +231,10 @@ class Grader(nn.Module):
     
  
 def main():
-    
-    archive = zipfile.ZipFile(os.path.join(
-        args.root,'prostate-cancer-grade-assessment.zip'), 'r')
-    train_csv = pd.read_csv(archive.open("train.csv"))
+    train_csv = pd.read_csv(os.path.join(args.root, "train.csv"))
     df = {}
     df['train'], df['val'] = train_test_split(train_csv, test_size=0.05, random_state=42)
-    dataset = {x: ProstateData(df[x], archive, x, 256, transform=transform[x]) 
+    dataset = {x: ProstateData(df[x], args.root, x, 256, transform=transform[x]) 
                 for x in ['train', 'val']}
     loader={x: DataLoader(dataset[x],
                           batch_size=args.batch_size, 
