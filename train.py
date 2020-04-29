@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import random 
 import openslide
 import skimage.measure
+import PIL
 from PIL.ImageOps import invert
 
 from sklearn.model_selection import train_test_split
@@ -104,8 +105,11 @@ def extract_images(img_id, img_dir, size, debug):
     image_path = os.path.join(img_dir, img_id + '.tiff')
     image = openslide.OpenSlide(image_path)
     w0,h0 = image.level_dimensions[0]
-    im = invert(image.get_thumbnail((size,size)))    
-    img = np.array(im).mean(2)
+    thumbnail = invert(image.get_thumbnail((size,size)))  
+    img = np.array(thumbnail).mean(2)
+    w1,h1 = thumbnail.size
+    im = PIL.Image.new('RGB',(size,size))
+    im.paste(thumbnail, (random.randrange(size+1-w1), random.randrange(size+1-h1)))
     num =  {16:8, 64:8}
     images = [im]
     for level, n in num.items():
