@@ -22,6 +22,11 @@ import torch.optim as optim
 from efficientnet_pytorch import EfficientNet
 from torch_multi_head_attention import MultiHeadAttention
 
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+set_seed(42)
 
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
