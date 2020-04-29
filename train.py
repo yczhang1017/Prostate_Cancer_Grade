@@ -169,44 +169,23 @@ class ProstateData(Dataset):
 
 
 class Grader(nn.Module):
-    def __init__(self, n = 64, o=nlabel):
+    def __init__(self, n = 128, o=nlabel):
         super(Grader, self).__init__()
         self.n = n
-        self.models = [EfficientNet.from_pretrained('efficientnet-b0'),
-                  EfficientNet.from_pretrained('efficientnet-b1'),
-                  EfficientNet.from_pretrained('efficientnet-b1'),]
-        self.fcq = [nn.Linear(1000,n),
-                    nn.Linear(1000,n),
-                    nn.Linear(1000,n)]
-        self.fck = [nn.Linear(1000,n),
-                    nn.Linear(1000,n),
-                    nn.Linear(1000,n)]
-        self.fcv = [nn.Linear(1000,n),
-                    nn.Linear(1000,n),
-                    nn.Linear(1000,n)]
+        self.model = EfficientNet.from_pretrained('efficientnet-b1')
+        self.fc1 = nn.Linear(1000,n*3)
         
         self.attention = MultiHeadAttention(in_features=n, head_num=8)
-        self.fc1 = nn.Linear(n,o)
+        self.fc2 = nn.Linear(n,o)
     def forward(self,x,size=args.size): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
-        xs = [x[:,0,:,:,:],
-              x[:,1:9,:,:,:].reshape(b*8, c, w, h),
-              x[:,9:,:,:,:].reshape(b*8, c, w, h)]
-        q = None
-        for x,m,fq,fk,fv in zip(xs, self.models, self.fcq, self.fck, self.fcv):
-            y0 = m(x).reshape(b, -1, 1000)
-            if q is None:
-                q = fq(y0)
-                k = fk(y0)
-                v = fv(y0)
-            else:
-                q = torch.cat((q, fq(y0)), dim = 1)
-                k = torch.cat((k, fk(y0)), dim = 1)
-                v = torch.cat((v, fv(y0)), dim = 1)
-        
+        x = x.view(b*17, c, w, h)
+        x = self.fc1(self.model(x))
+        q = x[b,17,:self.n]
+        k = x[b,17,self.n:2*self.n]
+        v = x[b,17,2*self.n:3*self.n]
         y = self.attention(q,k,v)   
-        # y (b,17,n)
-        y = self.fc1(y).mean(dim=1)
+        y = self.fc2(y).mean(dim=1)
         return y
     
 def main():
