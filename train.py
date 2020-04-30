@@ -124,8 +124,8 @@ def extract_images(img_id, img_dir, size, debug, mode):
             plt.figure()
             plt.imshow(label*255)
 
-        xs,ys = topk(label,12)
-        ll=list(range(12))
+        xs,ys = topk(label,level)
+        ll=list(range(level))
         random.shuffle(ll)
         ll = ll[:n]
         pts = [(x,y) for x,y in zip(xs[ll],ys[ll])]
