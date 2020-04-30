@@ -21,7 +21,7 @@ import torch.optim as optim
 
 from efficientnet_pytorch import EfficientNet
 from torch_multi_head_attention import MultiHeadAttention
-
+from sklearn.metrics import cohen_kappa_score
     
 def set_seed(seed):
     random.seed(seed)
@@ -226,7 +226,7 @@ def main():
             layer.float()
     
     num_class = np.array(train_csv.groupby('isup_grade').count().image_id)        
-    class_weights = np.power(num_class.max()/num_class, 0.7)
+    class_weights = np.power(num_class.max()/num_class, 1.3)
     print("class weights:",class_weights)
     class_weights = torch.tensor(class_weights, dtype=torch.float16, device=device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
@@ -242,7 +242,7 @@ def main():
     for epoch in range(args.resume_epoch, args.epochs):
         for phase in ['train','val']:
             t0 = time.time()
-            print("=========",phase,"=========")
+            print("========={}:{}=========".format(phase,epoch))
             if phase == 'train':
                 model.train()
             else:
@@ -252,6 +252,8 @@ def main():
             nums = np.zeros(6,dtype=int)
             corrects = np.zeros(6,dtype=int)
             running_loss=0
+            preds = None
+            truth = None
             for i, (inputs, targets) in enumerate(loader[phase]):
                 inputs = inputs.to(device).half()          
                 targets= targets.to(device)
@@ -272,14 +274,21 @@ def main():
                     if (i+1) % args.log_step == 0:
                         s = "({},{:.1f}s) Loss:{:.3f} Acc:{:.3f}" 
                         print(s.format(num, (time.time()-t0)/(i+1), loss.item(), acc))
-                        if phase == 'val':
-                            s=""
-                            for i in range(nlabel):
-                                t = targets.eq(i)
-                                nums[i] += t.sum().item()
-                                corrects[i] += (pred.eq(i)&t).sum().item()
-                                s+= "{}/{} |".format(corrects[i],nums[i])
-                            print(s)
+                    if phase == 'val':
+                        for i in range(nlabel):
+                            t = targets.eq(i)
+                            nums[i] += t.sum().item()
+                            corrects[i] += (pred.eq(i)&t).sum().item()
+                            if preds is None:
+                                preds = pred.cpu().numpy()
+                                truth = targets.cpu().numpy()
+                            else:
+                                preds = np.concatenate((preds, pred.cpu().numpy()))
+                                truth = np.concatenate((truth,truth.targets.cpu().numpy()))
+            
+            kappa = cohen_kappa_score(preds,truth)
+            print("kappa:{}".format(kappa) +
+                "|".join(["{}/{}".format(c,n) for c,n in zip(nums,corrects)]))
                         
             if phase=="train":scheduler.step()
             if epoch % 1 == 0 and phase=="train":
