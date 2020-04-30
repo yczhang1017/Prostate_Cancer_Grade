@@ -181,15 +181,14 @@ class Grader(nn.Module):
         self.n = n
         self.model = EfficientNet.from_pretrained(args.arch)
         self.act = nn.GELU()
-        self.norm = nn.BatchNorm1d(n)
+        self.norm = nn.BatchNorm1d(17)
         self.fc = nn.Linear(n,o)
     def forward(self,x,size=args.size): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         x = self.model(x.view(b*17, c, w, h))
         x = self.act(x).view(b,17,1000)
         x = self.norm(x)
-        x = self.fc(x)
-        x = self.act(x).mean(1)
+        x = self.fc(x).mean(1)
         return x
     
 def main():
