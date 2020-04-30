@@ -20,6 +20,7 @@ from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 
 from efficientnet_pytorch import EfficientNet
+from torch_multi_head_attention import MultiHeadAttention
 from sklearn.metrics import cohen_kappa_score
     
 def set_seed(seed):
@@ -176,19 +177,24 @@ class ProstateData(Dataset):
 
 
 class Grader(nn.Module):
-    def __init__(self, n=16, o=nlabel):
+    def __init__(self, n=256*3, o=nlabel):
         super(Grader, self).__init__()
         self.n = n
         self.model = EfficientNet.from_pretrained(args.arch)
-        #self.model._fc = nn.Linear(self.model._fc.in_features, n)
+        self.model._fc = nn.Linear(self.model._fc.in_features, n*3)
         self.act = nn.GELU()
-        self.norm = nn.LayerNorm([17,1000])
-        self.fc = nn.Linear(1000,o)
+        self.norm = nn.LayerNorm([17,n*3])
+        self.attention = MultiHeadAttention(n,8)
+        self.fc = nn.Linear(n,o)
     def forward(self,x,size=args.size): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         x = self.model(x.view(b*17, c, w, h))
         x = x.view(b,17,-1)
-        x = self.norm(self.act(x))
+        x = self.norm(self.act(x)).view(b,17,3,-1)
+        q = x[:,:,0,:]
+        k = x[:,:,1,:]
+        v = x[:,:,2,:]
+        x = self.attention(q,k,v)
         x = self.fc(x)
         return x.mean(1)
     
@@ -284,7 +290,7 @@ def main():
                                 truth = np.concatenate((truth, targets.cpu().numpy()))
             if phase == 'val':
                 kappa = cohen_kappa_score(preds,truth)
-                print("kappa:{}".format(kappa) +
+                print("kappa:{:.3f},".format(kappa) +
                     "|".join(["{}/{}".format(c,n) for c,n in zip(nums,corrects)]))
                         
             if phase=="train":scheduler.step()
