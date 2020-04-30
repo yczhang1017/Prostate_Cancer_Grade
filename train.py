@@ -39,7 +39,7 @@ parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
 parser.add_argument('--lr', default=0.01, type=float,
                     help='initial learning rate')
-parser.add_argument('-e','--epochs', default=15, type=int,
+parser.add_argument('-e','--epochs', default=24, type=int,
                     help='number of epochs to train')
 parser.add_argument('-o','--output_folder', default='save/', type=str,
                     help='Dir to save results')
@@ -53,7 +53,7 @@ parser.add_argument('-s','--size', default=128, type=int,
                     help='image size for training, divisible by 64')
 parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
-parser.add_argument('--step', default=5, type=int,
+parser.add_argument('--step', default=8, type=int,
                     help='step to reduce lr')
 parser.add_argument('-a','--arch', default='efficientnet-b4', type=str,
                     help='architecture of EfficientNet')
