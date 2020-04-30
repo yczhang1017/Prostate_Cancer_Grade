@@ -228,7 +228,7 @@ def main():
     num_class = np.array(train_csv.groupby('isup_grade').count().image_id)        
     class_weights = np.power(num_class.max()/num_class, 0.7)
     print("class weights:",class_weights)
-    class_weights = torch.tensor(class_weights, dtype = torch.cuda.HalfTensor)
+    class_weights = torch.tensor(class_weights, dtype=torch.float16, device=device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     #optimizer = torch.optim.RMSprop(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
