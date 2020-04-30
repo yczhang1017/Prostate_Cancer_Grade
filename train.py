@@ -227,7 +227,7 @@ def main():
             layer.float()
     
     num_class = np.array(train_csv.groupby('isup_grade').count().image_id)        
-    class_weights = np.power(num_class.max()/num_class, 1.3)
+    class_weights = np.power(num_class.max()/num_class, 1.1)
     print("class weights:",class_weights)
     class_weights = torch.tensor(class_weights, dtype=torch.float16, device=device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
