@@ -222,7 +222,7 @@ def main():
         layer.float()
     criterion = nn.CrossEntropyLoss().cuda()
     #optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
-    optimizer = torch.optim.RMSProp(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+    optimizer = torch.optim.RMSprop(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
     
     #scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10], gamma=0.1)
