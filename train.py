@@ -183,7 +183,7 @@ class Grader(nn.Module):
         self.model._fc = nn.Linear(self.model._fc.in_features, n)
         self.norm = nn.BatchNorm1d(n)
         self.act = nn.GELU()
-        self.fc = nn.Linear(17*n)
+        self.fc = nn.Linear(17*n,o)
     def forward(self,x,size=args.size): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         x = self.model(x.view(b*17, c, w, h))
