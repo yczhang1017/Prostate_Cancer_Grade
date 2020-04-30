@@ -189,7 +189,7 @@ class Grader(nn.Module):
         x = x.view(b,17,1000)
         x = self.act(x)
         x = self.norm(x)
-        x = self.encoder(x)
+        #x = self.encoder(x)
         x = self.fc1(x) # b x 17 x o
         return x.mean(1)
     
