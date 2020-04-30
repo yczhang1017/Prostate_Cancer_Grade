@@ -45,7 +45,7 @@ for level, n in num.items():
     for x,y in pts:
         s0 = max(w0,h0)
         l = image.get_best_level_for_downsample(s0//(level*size))
-        s = max(image.dimensions[l])
+        s = max(image.level_dimensions[l])
         ix,iy = x*s0//level , y*s0//level
         im = image.read_region((iy,ix), l, (s//level,s//level))        
         im = invert(im.resize((size,size)).convert('RGB'))
