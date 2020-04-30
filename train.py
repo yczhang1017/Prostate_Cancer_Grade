@@ -43,7 +43,7 @@ parser.add_argument('-e','--epochs', default=15, type=int,
                     help='number of epochs to train')
 parser.add_argument('-o','--output_folder', default='save/', type=str,
                     help='Dir to save results')
-parser.add_argument('-wd','--weight_decay', default=2e-4, type=float,
+parser.add_argument('-wd','--weight_decay', default=1e-5, type=float,
                     help='Weight decay')
 parser.add_argument('-c','--checkpoint', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
@@ -221,7 +221,8 @@ def main():
       if isinstance(layer, nn.BatchNorm2d):
         layer.float()
     criterion = nn.CrossEntropyLoss().cuda()
-    optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+    #optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+    optimizer = torch.optim.RMSProp(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
     
     #scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10], gamma=0.1)
