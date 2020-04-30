@@ -33,7 +33,7 @@ parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
 parser.add_argument('--root', default='..',
                     type=str, help='directory of the data')
-parser.add_argument('--batch_size', default=8, type=int,
+parser.add_argument('--batch_size', default=16, type=int,
                     help='Batch size for training')
 parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
@@ -51,7 +51,7 @@ parser.add_argument('-r','--resume_epoch', default=0, type=int,
                     help='epoch number to be resumed at')
 parser.add_argument('-s','--size', default=192, type=int,
                     help='image size for training, divisible by 64')
-parser.add_argument('-ls','--log_step', default=10, type=int,
+parser.add_argument('-ls','--log_step', default=5, type=int,
                     help='number of steps to print log')
 parser.add_argument('--step', default=5, type=int,
                     help='step to reduce lr')
