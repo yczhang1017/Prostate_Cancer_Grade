@@ -43,7 +43,7 @@ parser.add_argument('-e','--epochs', default=15, type=int,
                     help='number of epochs to train')
 parser.add_argument('-o','--output_folder', default='save/', type=str,
                     help='Dir to save results')
-parser.add_argument('-wd','--weight_decay', default=1e-5, type=float,
+parser.add_argument('-wd','--weight_decay', default=1e-4, type=float,
                     help='Weight decay')
 parser.add_argument('-c','--checkpoint', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
