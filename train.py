@@ -183,7 +183,7 @@ class Grader(nn.Module):
     def forward(self,x,size=args.size): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         x = self.model(x.view(b*17, c, w, h))
-        x = x.view(b,17,self.o).mean(1)
+        x = x.view(b,17,-1).mean(1)
         return x
     
 def main():
