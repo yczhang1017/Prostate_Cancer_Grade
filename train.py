@@ -56,7 +56,7 @@ parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
 parser.add_argument('--step', default=8, type=int,
                     help='step to reduce lr')
-parser.add_argument('-a','--arch', default='pnasnet5large', type=str,
+parser.add_argument('-a','--arch', default='efficientnet-b4', type=str,
                     help='architecture of EfficientNet')
 
 args = parser.parse_args()
@@ -181,12 +181,8 @@ class Grader(nn.Module):
     def __init__(self, n=256*3, o=nlabel):
         super(Grader, self).__init__()
         self.n = n
-        if (args.arch.startswith("efficientnet")):
-            self.model = EfficientNet.from_pretrained(args.arch)
-            self.model._fc = nn.Linear(self.model._fc.in_features, n*3)
-        else:
-            self.model = pretrainedmodels.__dict__[args.arch](num_classes=3*n, pretrained='imagenet')
-        
+        self.model = EfficientNet.from_pretrained(args.arch)
+        self.model._fc = nn.Linear(self.model._fc.in_features, n*3)
         self.act = nn.GELU()
         self.norm = nn.LayerNorm([17,n*3])
         self.attention = MultiHeadAttention(n,8)
