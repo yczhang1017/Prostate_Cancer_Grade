@@ -176,14 +176,20 @@ class ProstateData(Dataset):
 
 
 class Grader(nn.Module):
-    def __init__(self, o=nlabel):
+    def __init__(self, n=16, o=nlabel):
         super(Grader, self).__init__()
+        self.n = n
         self.model = EfficientNet.from_pretrained(args.arch)
-        self.model._fc = nn.Linear(self.model._fc.in_features,o)
+        self.model._fc = nn.Linear(self.model._fc.in_features, n)
+        self.norm = nn.BatchNorm1d(n)
+        self.act = nn.GELU()
+        self.fc = nn.Linear(17*n)
     def forward(self,x,size=args.size): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         x = self.model(x.view(b*17, c, w, h))
-        x = x.view(b,17,-1).mean(1)
+        x = x.view(b,17,-1)
+        x = self.act(self.norm(x))
+        x = self.fc(x.view(b,-1))
         return x
     
 def main():
