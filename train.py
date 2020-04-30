@@ -281,7 +281,7 @@ def main():
                                 truth = targets.cpu().numpy()
                             else:
                                 preds = np.concatenate((preds, pred.cpu().numpy()))
-                                truth = np.concatenate((truth,truth.targets.cpu().numpy()))
+                                truth = np.concatenate((truth, targets.cpu().numpy()))
             if phase == 'val':
                 kappa = cohen_kappa_score(preds,truth)
                 print("kappa:{}".format(kappa) +
