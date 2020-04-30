@@ -180,17 +180,17 @@ class Grader(nn.Module):
         super(Grader, self).__init__()
         self.n = n
         self.model = EfficientNet.from_pretrained(args.arch)
-        self.model._fc = nn.Linear(self.model._fc.in_features, n)
+        #self.model._fc = nn.Linear(self.model._fc.in_features, n)
         self.act = nn.GELU()
-        self.norm = nn.LayerNorm([17,n])
-        self.fc = nn.Linear(17*n,o)
+        self.norm = nn.LayerNorm([17,1000])
+        self.fc = nn.Linear(1000,o)
     def forward(self,x,size=args.size): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         x = self.model(x.view(b*17, c, w, h))
         x = x.view(b,17,-1)
         x = self.norm(self.act(x))
-        x = self.fc(x.view(b,-1))
-        return x
+        x = self.fc(x)
+        return x.mean(1)
     
 def main():
     train_csv = pd.read_csv(os.path.join(args.root, "train.csv"))
