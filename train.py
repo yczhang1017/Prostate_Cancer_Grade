@@ -179,10 +179,10 @@ class Grader(nn.Module):
     def forward(self,x,size=args.size): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         x = self.model(x.view(b*17, c, w, h))
-        x = self.fc1(x).view(b,17,3*self.n)
-        q = x[b,17,:self.n]
-        k = x[b,17,self.n:2*self.n]
-        v = x[b,17,2*self.n:3*self.n]
+        x = self.fc1(x).view(b,17,3,self.n)
+        q = x[:,:,0,:]
+        k = x[:,:,1,:]
+        v = x[:,:,2,:]
         y = self.attention(q,k,v)   
         y = self.fc2(y).mean(dim=1)
         return y
