@@ -135,8 +135,8 @@ def extract_images(img_id, img_dir, size, debug, mode):
             ix,iy = x*s0//level , y*s0//level
             if mode == 'train':
                 t = s0//level//2 - 1
-                ix += random.range(-t, t)
-                iy += random.range(-t, t)
+                ix += random.randrange(-t, t)
+                iy += random.randrange(-t, t)
             im = image.read_region((iy,ix), l, (s//level,s//level))        
             im = invert(im.resize((size,size)).convert('RGB'))
             images += [im]
