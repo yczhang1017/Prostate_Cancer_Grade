@@ -18,7 +18,7 @@ def topk(X, n):
     return x, y
 
 
-size = 192
+size = 128
 img_id = "001c62abd11fa4b57bf7a6c603a11bb9"
 image_path = os.path.join("../train_images", img_id + '.tiff')
 image = openslide.OpenSlide(image_path)
@@ -44,10 +44,11 @@ for level, n in num.items():
     print(pts)
     for x,y in pts:
         s0 = max(w0,h0)
+        l = image.get_best_level_for_downsample(s0//(level*size))
+        s = max(image.dimensions[l])
         ix,iy = x*s0//level , y*s0//level
-        im = image.read_region((iy,ix), 0, (s0//level,s0//level))        
+        im = image.read_region((iy,ix), l, (s//level,s//level))        
         im = invert(im.resize((size,size)).convert('RGB'))
-        images += [im]
 
     for i,im in enumerate(images):
         plt.figure()

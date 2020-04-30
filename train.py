@@ -49,7 +49,7 @@ parser.add_argument('-c','--checkpoint', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('-r','--resume_epoch', default=0, type=int,
                     help='epoch number to be resumed at')
-parser.add_argument('-s','--size', default=192, type=int,
+parser.add_argument('-s','--size', default=128, type=int,
                     help='image size for training, divisible by 64')
 parser.add_argument('-ls','--log_step', default=5, type=int,
                     help='number of steps to print log')
