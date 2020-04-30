@@ -20,7 +20,6 @@ from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 
 from efficientnet_pytorch import EfficientNet
-from torch_multi_head_attention import MultiHeadAttention
 from sklearn.metrics import cohen_kappa_score
     
 def set_seed(seed):
@@ -177,25 +176,25 @@ class ProstateData(Dataset):
 
 
 class Grader(nn.Module):
-    def __init__(self, n = 32, o=nlabel):
+    def __init__(self, o=nlabel):
         super(Grader, self).__init__()
-        self.n = n
         self.model = EfficientNet.from_pretrained(args.arch)
-        self.fcq = nn.Linear(1000,n)
-        self.fck = nn.Linear(1000,n)
-        self.fcv = nn.Linear(1000,n)
-        self.attention = MultiHeadAttention(in_features=n, head_num=4)
-        self.fc2 = nn.Linear(n,o)
+        self.act = nn.GELU()
+        self.norm = nn.LayerNorm([17, 1000])
+        self.encoder = nn.TransformerEncoderLayer(d_model=1000, nhead=8)
+        self.fc1 = nn.Linear(1000,o)
+        self.fc2 = nn.Linear(17,1)
     def forward(self,x,size=args.size): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         x = self.model(x.view(b*17, c, w, h))
         x = x.view(b,17,1000)
-        q = self.fcq(x)
-        k = self.fck(x)
-        v = self.fcv(x)
-        y = self.attention(q,k,v)   
-        y = self.fc2(y).mean(dim=1)
-        return y
+        x = self.act(x)
+        x = self.norm(x)
+        x = self.encoder(x)
+        x = self.fc1(x) # b x 17 x o
+        x = x.permute(0,2,1) # b x o x 17
+        x = self.fc2(x).squeeze() 
+        return x
     
 def main():
     train_csv = pd.read_csv(os.path.join(args.root, "train.csv"))
