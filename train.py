@@ -176,22 +176,25 @@ class ProstateData(Dataset):
 
 
 class Grader(nn.Module):
-    def __init__(self, o=nlabel):
+    def __init__(self, n = 256, o=nlabel):
         super(Grader, self).__init__()
+        self.n = n
         self.model = EfficientNet.from_pretrained(args.arch)
         self.act = nn.GELU()
-        self.norm = nn.LayerNorm([17, 1000])
-        self.encoder = nn.TransformerEncoderLayer(d_model=1000, nhead=8)
-        self.fc1 = nn.Linear(1000,o)
+        self.norm = nn.BatchNorm1d(n)
+        self.attention = nn.MultiheadAttention(n, 8)
+        self.fc = nn.Linear(n,o)
     def forward(self,x,size=args.size): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         x = self.model(x.view(b*17, c, w, h))
-        x = x.view(b,17,1000)
-        x = self.act(x)
+        x = self.act(x).view(b,17,1000)
         x = self.norm(x)
-        #x = self.encoder(x)
-        x = self.fc1(x) # b x 17 x o
-        return x.mean(1)
+        q = self.fcq(x)
+        k = self.fck(x)
+        v = self.fcv(x)
+        y = self.attention(q,k,v)   
+        y = self.fc(y)
+        return y
     
 def main():
     train_csv = pd.read_csv(os.path.join(args.root, "train.csv"))
