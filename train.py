@@ -37,7 +37,7 @@ parser.add_argument('--batch_size', default=16, type=int,
                     help='Batch size for training')
 parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
-parser.add_argument('--lr', default=0.01, type=float,
+parser.add_argument('--lr', default=0.001, type=float,
                     help='initial learning rate')
 parser.add_argument('-e','--epochs', default=15, type=int,
                     help='number of epochs to train')
