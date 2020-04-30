@@ -28,7 +28,7 @@ img = np.array(thumbnail).mean(2)
 w1,h1 = thumbnail.size
 im = PIL.Image.new('RGB',(size,size))
 im.paste(thumbnail, (random.randrange(size+1-w1), random.randrange(size+1-h1)))
-num =  {16:8, 64:8}
+num =  {16:4, 32:4, 64:4, 128:4}
 images = [im]
 
 for level, n in num.items():
