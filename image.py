@@ -17,7 +17,7 @@ def topk(X, n):
         x[i], y[i] = np.unravel_index(ij, X.shape)
     return x, y
 
-
+mode= 'train'
 size = 128
 img_id = "001c62abd11fa4b57bf7a6c603a11bb9"
 image_path = os.path.join("../train_images", img_id + '.tiff')
@@ -30,6 +30,7 @@ im = PIL.Image.new('RGB',(size,size))
 im.paste(thumbnail, (random.randrange(size+1-w1), random.randrange(size+1-h1)))
 num =  {16:8, 64:8}
 images = [im]
+
 for level, n in num.items():
     r = size // level
     label = skimage.measure.block_reduce(img, (r,r), np.mean)
@@ -47,6 +48,10 @@ for level, n in num.items():
         l = image.get_best_level_for_downsample(s0//(level*size))
         s = max(image.level_dimensions[l])
         ix,iy = x*s0//level , y*s0//level
+        if mode == 'train':
+            t = s0//level//2 - 1
+            ix += random.range(-t, t)
+            iy += random.range(-t, t)
         im = image.read_region((iy,ix), l, (s//level,s//level))        
         im = invert(im.resize((size,size)).convert('RGB'))
         images += [im]

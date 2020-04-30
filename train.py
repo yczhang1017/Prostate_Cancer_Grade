@@ -105,7 +105,7 @@ extract_images("001c62abd11fa4b57bf7a6c603a11bb9",
     256,
     False)
 '''            
-def extract_images(img_id, img_dir, size, debug):
+def extract_images(img_id, img_dir, size, debug, mode):
     image_path = os.path.join(img_dir, img_id + '.tiff')
     image = openslide.OpenSlide(image_path)
     w0,h0 = image.level_dimensions[0]
@@ -114,7 +114,7 @@ def extract_images(img_id, img_dir, size, debug):
     w1,h1 = thumbnail.size
     im = PIL.Image.new('RGB',(size,size))
     im.paste(thumbnail, (random.randrange(size+1-w1), random.randrange(size+1-h1)))
-    num =  {16:8, 64:8}
+    num =  {16:4, 32:4, 64:4, 128:4}
     images = [im]
     for level, n in num.items():
         r = size // level
@@ -133,6 +133,10 @@ def extract_images(img_id, img_dir, size, debug):
             l = image.get_best_level_for_downsample(s0//(level*size))
             s = max(image.level_dimensions[l])
             ix,iy = x*s0//level , y*s0//level
+            if mode == 'train':
+                t = s0//level//2 - 1
+                ix += random.range(-t, t)
+                iy += random.range(-t, t)
             im = image.read_region((iy,ix), l, (s//level,s//level))        
             im = invert(im.resize((size,size)).convert('RGB'))
             images += [im]
@@ -157,7 +161,7 @@ class ProstateData(Dataset):
     def __getitem__(self, idx):
         img_id = self.df.iloc[idx].image_id
         label = self.df.iloc[idx].isup_grade
-        images = extract_images(img_id, self.img_dir, self.size, False)
+        images = extract_images(img_id, self.img_dir, self.size, False, self.mode)
         image_tensor = None
         for im in images:
             tensor = self.transform(im).unsqueeze(0)
@@ -220,7 +224,12 @@ def main():
     for layer in model.modules():
         if isinstance(layer, nn.BatchNorm2d):
             layer.float()
-    criterion = nn.CrossEntropyLoss().cuda()
+    
+    num_class = np.array(df.groupby('isup_grade').count().image_id)        
+    class_weights = np.power(num_class.max()/num_class, 0.7)
+    print("class weights:",class_weights)
+    class_weights = torch.tensor(class_weights).to(device)
+    criterion = nn.CrossEntropyLoss(weight=class_weights).cuda()
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     #optimizer = torch.optim.RMSprop(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
@@ -263,15 +272,14 @@ def main():
                     if (i+1) % args.log_step == 0:
                         s = "({},{:.1f}s) Loss:{:.3f} Acc:{:.3f}" 
                         print(s.format(num, (time.time()-t0)/(i+1), loss.item(), acc))
-                    
-                    if phase == 'val':
-                        s=""
-                        for i in range(nlabel):
-                            t = targets.eq(i)
-                            nums[i] += t.sum().item()
-                            corrects[i] = (pred.eq(i)&t).sum().item()
-                            s+= "{}/{} |".format(nums[i],corrects[i])
-                        print(s)
+                        if phase == 'val':
+                            s=""
+                            for i in range(nlabel):
+                                t = targets.eq(i)
+                                nums[i] += t.sum().item()
+                                corrects[i] += (pred.eq(i)&t).sum().item()
+                                s+= "{}/{} |".format(corrects[i],nums[i])
+                            print(s)
                         
             if phase=="train":scheduler.step()
             if epoch % 1 == 0 and phase=="train":
