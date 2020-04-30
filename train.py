@@ -55,6 +55,8 @@ parser.add_argument('-ls','--log_step', default=5, type=int,
                     help='number of steps to print log')
 parser.add_argument('--step', default=5, type=int,
                     help='step to reduce lr')
+parser.add_argument('-a','--arch', default='efficientnet-b3', type=str,
+                    help='architecture of EfficientNet')
 
 args = parser.parse_args()
 
@@ -174,7 +176,7 @@ class Grader(nn.Module):
     def __init__(self, n = 128, o=nlabel):
         super(Grader, self).__init__()
         self.n = n
-        self.model = EfficientNet.from_pretrained('efficientnet-b1')
+        self.model = EfficientNet.from_pretrained(args.arch)
         self.fc1 = nn.Linear(1000,n*3)
         self.attention = MultiHeadAttention(in_features=n, head_num=8)
         self.fc2 = nn.Linear(n,o)
