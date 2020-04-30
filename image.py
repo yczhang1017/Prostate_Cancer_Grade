@@ -49,6 +49,7 @@ for level, n in num.items():
         ix,iy = x*s0//level , y*s0//level
         im = image.read_region((iy,ix), l, (s//level,s//level))        
         im = invert(im.resize((size,size)).convert('RGB'))
+        images += [im]
 
     for i,im in enumerate(images):
         plt.figure()
