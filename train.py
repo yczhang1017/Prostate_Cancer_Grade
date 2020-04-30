@@ -183,7 +183,6 @@ class Grader(nn.Module):
         self.norm = nn.LayerNorm([17, 1000])
         self.encoder = nn.TransformerEncoderLayer(d_model=1000, nhead=8)
         self.fc1 = nn.Linear(1000,o)
-        self.fc2 = nn.Linear(17,1)
     def forward(self,x,size=args.size): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         x = self.model(x.view(b*17, c, w, h))
@@ -192,9 +191,7 @@ class Grader(nn.Module):
         x = self.norm(x)
         x = self.encoder(x)
         x = self.fc1(x) # b x 17 x o
-        x = x.permute(0,2,1) # b x o x 17
-        x = self.fc2(x).squeeze() 
-        return x
+        return x.mean(1)
     
 def main():
     train_csv = pd.read_csv(os.path.join(args.root, "train.csv"))
