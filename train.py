@@ -176,7 +176,7 @@ class ProstateData(Dataset):
 
 
 class Grader(nn.Module):
-    def __init__(self, n = 64, o=nlabel):
+    def __init__(self, n = 32, o=nlabel):
         super(Grader, self).__init__()
         self.n = n
         self.model = EfficientNet.from_pretrained(args.arch)
@@ -191,7 +191,7 @@ class Grader(nn.Module):
         x = self.act(x).view(b,17,1000)
         x = self.norm1(x)
         x = self.fc1(x)
-        x = self.act(x).view(b,17*n)
+        x = self.act(x).view(b,17*self.n)
         x = self.norm2(x)
         x = self.fc2(x)
         return x
