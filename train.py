@@ -262,7 +262,7 @@ def main():
                     acc = 100.0 * correct / num
                     if (i+1) % args.log_step == 0:
                         s = "({},{:.1f}s) Loss:{:.3f} Acc:{:.3f}" 
-                        print(s.format(num, (time.time()-t0)/(i+1), running_loss/num, acc))
+                        print(s.format(num, (time.time()-t0)/(i+1), loss.item(), acc))
                     
                     if phase == 'val':
                         s=""
