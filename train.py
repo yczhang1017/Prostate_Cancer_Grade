@@ -282,10 +282,10 @@ def main():
                             else:
                                 preds = np.concatenate((preds, pred.cpu().numpy()))
                                 truth = np.concatenate((truth,truth.targets.cpu().numpy()))
-            
-            kappa = cohen_kappa_score(preds,truth)
-            print("kappa:{}".format(kappa) +
-                "|".join(["{}/{}".format(c,n) for c,n in zip(nums,corrects)]))
+            if phase == 'val':
+                kappa = cohen_kappa_score(preds,truth)
+                print("kappa:{}".format(kappa) +
+                    "|".join(["{}/{}".format(c,n) for c,n in zip(nums,corrects)]))
                         
             if phase=="train":scheduler.step()
             if epoch % 1 == 0 and phase=="train":
