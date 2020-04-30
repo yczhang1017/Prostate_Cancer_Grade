@@ -19,6 +19,7 @@ from torchvision.transforms import transforms
 from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 
+import pretrainedmodels
 from efficientnet_pytorch import EfficientNet
 from torch_multi_head_attention import MultiHeadAttention
 from sklearn.metrics import cohen_kappa_score
@@ -33,7 +34,7 @@ parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
 parser.add_argument('--root', default='..',
                     type=str, help='directory of the data')
-parser.add_argument('--batch_size', default=16, type=int,
+parser.add_argument('--batch_size', default=12, type=int,
                     help='Batch size for training')
 parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
@@ -55,7 +56,7 @@ parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
 parser.add_argument('--step', default=8, type=int,
                     help='step to reduce lr')
-parser.add_argument('-a','--arch', default='efficientnet-b4', type=str,
+parser.add_argument('-a','--arch', default='pnasnet5large', type=str,
                     help='architecture of EfficientNet')
 
 args = parser.parse_args()
@@ -180,8 +181,12 @@ class Grader(nn.Module):
     def __init__(self, n=256*3, o=nlabel):
         super(Grader, self).__init__()
         self.n = n
-        self.model = EfficientNet.from_pretrained(args.arch)
-        self.model._fc = nn.Linear(self.model._fc.in_features, n*3)
+        if (args.arch.startswith("efficientnet")):
+            self.model = EfficientNet.from_pretrained(args.arch)
+            self.model._fc = nn.Linear(self.model._fc.in_features, n*3)
+        else:
+            self.model = pretrainedmodels.__dict__[args.arch](num_classes=3*n, pretrained='imagenet')
+        
         self.act = nn.GELU()
         self.norm = nn.LayerNorm([17,n*3])
         self.attention = MultiHeadAttention(n,8)
