@@ -126,7 +126,7 @@ class ProstateSeg(Dataset):
         return im,target
  
 class FocalLoss(nn.Module):
-    def __init__(self, alpha=1, gamma=3):
+    def __init__(self, alpha= None, gamma=3):
         super(FocalLoss, self).__init__()
         self.alpha = alpha
         self.gamma = gamma
@@ -135,7 +135,7 @@ class FocalLoss(nn.Module):
         nl = F.nll_loss(x1,y,reduction='none')
         pt = torch.exp(-nl)
         print(x1.shape,nl.shape,pt.shape)
-        if self.alpha == 1:
+        if self.alpha is None:
             return  ((1-pt)**self.gamma * nl).mean()
         nll = F.nll_loss(x1,y,weight=self.alpha,reduction='none')
         return ((1-pt)**self.gamma * nll).mean()
