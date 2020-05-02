@@ -27,7 +27,7 @@ parser.add_argument('--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
 parser.add_argument('--lr', default=0.01, type=float,
                     help='initial learning rate')
-parser.add_argument('--epochs', default=24, type=int,
+parser.add_argument('--epochs', default=25, type=int,
                     help='number of epochs to train')
 parser.add_argument('--output_folder', default='save/', type=str,
                     help='Dir to save results')
@@ -40,7 +40,6 @@ parser.add_argument('--resume_epoch', default=0, type=int,
 parser.add_argument('--size', default=2048, type=int)
 parser.add_argument('--crop_size', default=600, type=int)
 parser.add_argument('--log', default=1, type=int, help='steps to print log')
-parser.add_argument('--step', default=8, type=int, help='step to reduce lr')
 
 
 args = parser.parse_args()
