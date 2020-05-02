@@ -157,7 +157,7 @@ def main():
         pretrained=True, progress=True)
     model.to(device)
     model.classifier = DeepLabHead(2048, nlabel)
-    criterion = nn.CrossEntropyLoss(weight=[1,1,1,10,10,20])
+    criterion = nn.CrossEntropyLoss(weight=torch.tensor([1,1,20,20,20,60],dtype=torch.float32,device=device))
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     
     for epoch in range(args.resume_epoch, args.epochs):
@@ -214,7 +214,7 @@ def main():
                 torch.save(model.state_dict(), 
                            os.path.join(args.output_folder,"deeplab-{}.pth".format(epoch)))
             if phase == 'val':
-                print("|".join(["{}/{}".format(c,n) for c,n in zip(nums,corrects)]))
+                print("|".join(["{:.5f}".format(c/n) for c,n in zip(corrects,nums)]))
 
 if __name__ == '__main__':
     main()
