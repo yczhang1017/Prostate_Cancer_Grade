@@ -165,17 +165,8 @@ def main():
     df['train'], df['val'] = train_test_split(by_radboud, 
           stratify=by_radboud.isup_grade, test_size=20, random_state=42)
     
-    
-    s1, s2 = int(0.9*args.crop_size), int(1.1*args.crop_size)
-    crop = (randint(s1,s2), randint(s1,s2))
     dataset = {'val': ProstateSeg(df['val'], args.root, args.size, (args.crop_size, args.crop_size), 'val')}
     loader = {'val': DataLoader(dataset['val'],num_workers = args.workers,pin_memory=True)}
-    dataset['train'] = ProstateSeg(df['train'], args.root, args.size, crop, 'train')
-    loader['train'] = DataLoader(dataset['train'],
-        batch_size=args.batch_size, shuffle = True,
-        num_workers = args.workers, pin_memory=True)
-
-    
     model = models.segmentation.deeplabv3_resnet101(
             pretrained=(not args.checkpoint))
     
@@ -193,6 +184,12 @@ def main():
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     
     for epoch in range(args.resume_epoch, args.epochs):
+        s1, s2 = int(0.9*args.crop_size), int(1.1*args.crop_size)
+        crop = (randint(s1,s2), randint(s1,s2))
+        dataset['train'] = ProstateSeg(df['train'], args.root, args.size, crop, 'train')
+        loader['train'] = DataLoader(dataset['train'],
+            batch_size=args.batch_size, shuffle = True,
+            num_workers = args.workers, pin_memory=True)
         adjust_lr(optimizer, epoch, args)
         for phase in ['train','val']:
             t0 = time.time()
@@ -208,6 +205,7 @@ def main():
             corrects = np.zeros(6,dtype=int)
             for i, (inputs, masks) in enumerate(loader[phase]):
                 t1 = time.time()
+                if i==0: print(inputs.shape) 
                 inputs = inputs.to(device)   
                 masks= masks.to(device)
                 optimizer.zero_grad()
@@ -217,8 +215,6 @@ def main():
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
-                        s1, s2 = int(0.9*args.crop_size), int(1.1*args.crop_size)
-                        loader[phase].dataset.crop_size = (randint(s1,s2), randint(s1,s2))
                     
                     num += masks.size(0)
                     npixel  = np.prod(masks.shape)
@@ -228,7 +224,7 @@ def main():
                     if (i+1) % args.log == 0:
                         t2 = time.time()
                         s = "({},{:.1f}s,{:.1f}s) Loss:{:.3f} Acc:{:.3f}" 
-                        print(inputs.shape, s.format(num, t2-t1, (t2-t0)/(i+1), loss.item(), acc))
+                        print(s.format(num, t2-t1, (t2-t0)/(i+1), loss.item(), acc))
                     if phase == 'val':
                         for i in range(nlabel):
                             t = masks.eq(i)
