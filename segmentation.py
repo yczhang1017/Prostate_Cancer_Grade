@@ -39,7 +39,7 @@ parser.add_argument('--checkpoint', default=None, type=str,
 parser.add_argument('--resume_epoch', default=0, type=int,
                     help='epoch number to be resumed at')
 parser.add_argument('--size', default=2048, type=int)
-parser.add_argument('--crop_size', default=600, type=int)
+parser.add_argument('--crop_size', default=640, type=int)
 parser.add_argument('--log', default=1, type=int, help='steps to print log')
 
 
