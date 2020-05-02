@@ -3,6 +3,7 @@ import time
 import argparse
 import torch
 from torch import nn
+import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 import pandas as pd
 import numpy as np
@@ -124,7 +125,22 @@ class ProstateSeg(Dataset):
         target = torch.from_numpy(np.array(mm).astype('int64'))
         return im,target
  
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=1, gamma=3):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+    def forward(self, x, y):
+        x1 = F.log_softmax(x,1)
+        nl = F.nll_loss(x1,y,reduction='none')
+        pt = torch.exp(-nl)
+        print(x1.shape,nl.shape,pt.shape)
+        if self.alpha == 1:
+            return  ((1-pt)**self.gamma * nl).mean()
+        nll = F.nll_loss(x1,y,weight=self.alpha,reduction='none')
+        return ((1-pt)**self.gamma * nll).mean()
 
+        
 def adjust_lr(optimizer, epoch, args):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
     lr = args.lr * (1 -  (epoch // args.epochs))**0.9
@@ -151,13 +167,24 @@ def main():
           stratify=by_radboud.isup_grade, test_size=20, random_state=42)
     dataset = {'val': ProstateSeg(df['val'], args.root, args.size, (args.crop_size, args.crop_size), 'val')}
     loader = {'val': DataLoader(dataset['val'],num_workers = args.workers,pin_memory=True)}
-     
+    
+    
+    
+    
     model = models.segmentation.deeplabv3_resnet101(
-        pretrained=True, progress=True)
-    model.to(device)
+            pretrained=(not args.checkpoint))
+    
     model.classifier = DeepLabHead(2048, nlabel)
-    criterion = nn.CrossEntropyLoss(weight=torch.tensor([1,4,30,40,20,80],dtype=torch.float32,device=device))
-    #criterion = FocalLoss(alpha = torch.tensor([1,3,20,30,10,60],dtype=torch.float32,device=device))
+    model.to(device)
+    if args.checkpoint:
+        print('Resuming training from epoch {}, loading {}...'
+              .format(args.resume_epoch,args.checkpoint))
+        weight_file=os.path.join(args.output_folder, args.checkpoint)
+        model.load_state_dict(torch.load(weight_file,
+                                 map_location=lambda storage, loc: storage))
+    
+    
+    criterion = FocalLoss(alpha = torch.tensor([1, 1.4, 8, 10, 6, 20],dtype=torch.float32,device=device))
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     
     for epoch in range(args.resume_epoch, args.epochs):
