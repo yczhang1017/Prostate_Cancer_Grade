@@ -134,7 +134,6 @@ class FocalLoss(nn.Module):
         x1 = F.log_softmax(x,1)
         nl = F.nll_loss(x1,y,reduction='none')
         pt = torch.exp(-nl)
-        print(x1.shape,nl.shape,pt.shape)
         if self.alpha is None:
             return  ((1-pt)**self.gamma * nl).mean()
         nll = F.nll_loss(x1,y,weight=self.alpha,reduction='none')
