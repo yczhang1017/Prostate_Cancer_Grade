@@ -157,7 +157,7 @@ def main():
         pretrained=True, progress=True)
     model.to(device)
     model.classifier = DeepLabHead(2048, nlabel)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=[1,1,1,10,10,20])
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     
     for epoch in range(args.resume_epoch, args.epochs):
