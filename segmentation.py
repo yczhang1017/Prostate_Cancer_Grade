@@ -126,7 +126,7 @@ class ProstateSeg(Dataset):
         return im,target
  
 class FocalLoss(nn.Module):
-    def __init__(self, alpha= None, gamma=4):
+    def __init__(self, alpha= None, gamma=3):
         super(FocalLoss, self).__init__()
         self.alpha = alpha
         self.gamma = gamma
@@ -183,7 +183,7 @@ def main():
                                  map_location=lambda storage, loc: storage))
     
     
-    criterion = FocalLoss(alpha = torch.tensor([1, 1.5, 9, 13, 6, 30],dtype=torch.float32,device=device))
+    criterion = FocalLoss(alpha = torch.tensor([1, 1.4, 8, 10, 6, 20],dtype=torch.float32,device=device))
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     
     for epoch in range(args.resume_epoch, args.epochs):
