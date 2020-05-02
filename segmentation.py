@@ -126,7 +126,7 @@ class ProstateSeg(Dataset):
         return im,target
  
 class FocalLoss(nn.Module):
-    def __init__(self, alpha= None, gamma=3):
+    def __init__(self, alpha= None, gamma=4):
         super(FocalLoss, self).__init__()
         self.alpha = alpha
         self.gamma = gamma
@@ -183,7 +183,7 @@ def main():
                                  map_location=lambda storage, loc: storage))
     
     
-    criterion = FocalLoss(alpha = torch.tensor([1, 1.4, 8, 10, 6, 20],dtype=torch.float32,device=device))
+    criterion = FocalLoss(alpha = torch.tensor([1, 1.5, 9, 13, 6, 30],dtype=torch.float32,device=device))
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     
     for epoch in range(args.resume_epoch, args.epochs):
@@ -204,6 +204,7 @@ def main():
             num = 0
             correct = 0
             nums = np.zeros(6,dtype=int)
+            pros = np.zeros(6,dtype=int)
             corrects = np.zeros(6,dtype=int)
             for i, (inputs, masks) in enumerate(loader[phase]):
                 t1 = time.time()
@@ -231,15 +232,18 @@ def main():
                     if phase == 'val':
                         for i in range(nlabel):
                             t = masks.eq(i)
+                            p = pred.eq(i)
                             nums[i] += t.sum().item()
-                            corrects[i] += (pred.eq(i)&t).sum().item()
+                            pros[i] += p.sum().item()
+                            corrects[i] += (p&t).sum().item()
                             
             
             if epoch % 1 == 0 and phase=="train":
                 torch.save(model.state_dict(), 
                            os.path.join(args.output_folder,"deeplab-{}.pth".format(epoch)))
             if phase == 'val':
-                print("|".join(["{:.5f}".format(c/n) for c,n in zip(corrects,nums)]))
+                print("recall:"+"|".join(["{:.5f}".format(c/n) for c,n in zip(corrects,nums)]))
+                print("precision:"+"|".join(["{:.5f}".format(c/p) for c,p in zip(corrects,pros)]))
 
 if __name__ == '__main__':
     main()
