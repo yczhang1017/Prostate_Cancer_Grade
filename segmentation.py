@@ -39,7 +39,7 @@ parser.add_argument('--checkpoint', default=None, type=str,
 parser.add_argument('--resume_epoch', default=0, type=int,
                     help='epoch number to be resumed at')
 parser.add_argument('--size', default=2048, type=int)
-parser.add_argument('--crop_size', default=600, type=int)
+parser.add_argument('--crop_size', default=640, type=int)
 parser.add_argument('--log', default=1, type=int, help='steps to print log')
 
 
@@ -168,10 +168,8 @@ def main():
     dataset = {'val': ProstateSeg(df['val'], args.root, args.size, (args.crop_size, args.crop_size), 'val')}
     loader = {'val': DataLoader(dataset['val'],num_workers = args.workers,pin_memory=True)}
     model = models.segmentation.deeplabv3_resnet101(
-            pretrained=(not args.checkpoint))
-    
+            pretrained=True, progress=True)
     model.classifier = DeepLabHead(2048, nlabel)
-    model.to(device)
     if args.checkpoint:
         print('Resuming training from epoch {}, loading {}...'
               .format(args.resume_epoch,args.checkpoint))
@@ -179,7 +177,7 @@ def main():
         model.load_state_dict(torch.load(weight_file,
                                  map_location=lambda storage, loc: storage))
     
-    
+    model.to(device)
     criterion = FocalLoss(alpha = torch.tensor([1, 1.4, 8, 7, 6, 12],dtype=torch.float32,device=device))
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     
