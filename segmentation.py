@@ -217,7 +217,7 @@ def main():
                     num += masks.size(0)
                     npixel  = np.prod(masks.shape)
                     pred = output['out'].argmax(dim=1)
-                    correct = (pred.cpu()==masks.cpu()).sum().item() 
+                    correct = (pred.cpu()==masks.cpu()).sum()
                     acc = correct*100 / npixel
                     if (i+1) % args.log == 0:
                         t2 = time.time()
