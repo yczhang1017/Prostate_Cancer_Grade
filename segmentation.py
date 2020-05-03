@@ -60,7 +60,7 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-set_seed(42)
+set_seed(23)
 nlabel = 6
 
 def get_image_mask(
@@ -217,7 +217,7 @@ def main():
                     num += masks.size(0)
                     npixel  = np.prod(masks.shape)
                     pred = output['out'].argmax(dim=1)
-                    correct = pred.eq(masks).sum().cpu().item() 
+                    correct = (pred.cpu()==masks.cpu()).sum().item() 
                     acc = correct*100 / npixel
                     if (i+1) % args.log == 0:
                         t2 = time.time()
@@ -227,8 +227,8 @@ def main():
                         for i in range(nlabel):
                             t = masks.eq(i)
                             p = pred.eq(i)
-                            nums[i] += t.sum().cpu().item()
-                            pros[i] += p.sum().cpu().item()
+                            nums[i] += t.sum().item()
+                            pros[i] += p.sum().item()
                             corrects[i] += (p&t).sum().item()
                             
             
