@@ -227,8 +227,8 @@ def main():
                         for i in range(nlabel):
                             t = masks.eq(i)
                             p = pred.eq(i)
-                            nums[i] += t.sum().item()
-                            pros[i] += p.sum().item()
+                            nums[i] += t.sum().cpu().item()
+                            pros[i] += p.sum().cpu().item()
                             corrects[i] += (p&t).sum().item()
                             
             
