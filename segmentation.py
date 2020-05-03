@@ -60,7 +60,7 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-set_seed(25)
+set_seed(42)
 nlabel = 6
 
 def get_image_mask(
@@ -163,7 +163,7 @@ def main():
 
     df = {} 
     df['train'], df['val'] = train_test_split(by_radboud, 
-          stratify=by_radboud.isup_grade, test_size=20, random_state=25)
+          stratify=by_radboud.isup_grade, test_size=20, random_state=42)
     
     dataset = {'val': ProstateSeg(df['val'], args.root, args.size, (args.crop_size, args.crop_size), 'val')}
     loader = {'val': DataLoader(dataset['val'],num_workers = args.workers,pin_memory=True)}
@@ -217,7 +217,7 @@ def main():
                     num += masks.size(0)
                     npixel  = np.prod(masks.shape)
                     pred = output['out'].argmax(dim=1)
-                    correct = pred.eq(masks).sum().item() 
+                    correct = pred.eq(masks).sum().cpu().item() 
                     acc = correct*100 / npixel
                     if (i+1) % args.log == 0:
                         t2 = time.time()
