@@ -11,7 +11,6 @@ from torchvision import models
 from torch.utils.data import DataLoader,Dataset
 from torchvision.transforms import transforms
 import argparse
-import pickle
 parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
 parser.add_argument('--root', default='..',
@@ -100,6 +99,5 @@ def main():
             for i in range(nlabel):
                 pp[i] = pred.eq(i).sum() / npix
             print("{}s".format(time.time()-t0), imid, pp ,grade)
-            pickle.dump(pred, open(os.path.join(args.dump, imid),"wb"))
-            
+            torch.save(pred, os.path.join(args.dump, imid))
                 
