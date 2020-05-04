@@ -11,7 +11,7 @@ from PIL.ImageOps import invert
 mode= 'train'
 size = 128
 img_id = "001c62abd11fa4b57bf7a6c603a11bb9"
-img_dir = ".."
+img_dir = "../train_images"
 
 
 def topk(X, n):
@@ -56,6 +56,8 @@ for level, n in num.items():
             ix += random.randrange(-t, t)
             iy += random.randrange(-t, t)
             crop_size = int(random.uniform(0.8*crop_size,1.2*crop_size))
+            
+        print((w0,h0),(iy,ix), l, (crop_size,crop_size))
         im = image.read_region((iy,ix), l, (crop_size,crop_size))    
        
         if debug:
