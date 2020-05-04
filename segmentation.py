@@ -121,7 +121,6 @@ class ProstateSeg(Dataset):
         im,mm = get_image_mask(img_id, self.data_dir, self.size, self.crop, self.mode)
         if transform is not None:
             im = transform(im)
-        
         target = torch.from_numpy(np.array(mm).astype('int64'))
         return im,target
  
@@ -213,12 +212,12 @@ def main():
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
-                    
-                    num += masks.size(0)
-                    npixel  = np.prod(masks.shape)
                     pred = output['out'].argmax(dim=1)
-                    correct = (pred.cpu()==masks.cpu()).sum().item()
+                    correct = pred.eq(masks).sum().item()
+                    npixel  = np.prod(masks.shape)
                     acc = correct*100 / npixel
+                    num += masks.size(0)
+                    
                     if (i+1) % args.log == 0:
                         t2 = time.time()
                         s = "({},{:.1f}s,{:.1f}s) Loss:{:.3f} Acc:{:.3f}" 
