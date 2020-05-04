@@ -8,10 +8,10 @@ import pandas as pd
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import random 
 import openslide
 import skimage.measure
-import PIL
 from PIL.ImageOps import invert
 
 from sklearn.model_selection import train_test_split
@@ -19,9 +19,8 @@ from torchvision.transforms import transforms
 from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 
-import pretrainedmodels
+#import pretrainedmodels
 from efficientnet_pytorch import EfficientNet
-from torch_multi_head_attention import MultiHeadAttention
 from sklearn.metrics import cohen_kappa_score
     
 def set_seed(seed):
@@ -50,11 +49,11 @@ parser.add_argument('-c','--checkpoint', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('-r','--resume_epoch', default=0, type=int,
                     help='epoch number to be resumed at')
-parser.add_argument('-s','--size', default=192, type=int,
+parser.add_argument('-s','--size', default=128, type=int,
                     help='image size for training, divisible by 64')
 parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
-parser.add_argument('--step', default=8, type=int,
+parser.add_argument('--step', default=4, type=int,
                     help='step to reduce lr')
 parser.add_argument('-a','--arch', default='efficientnet-b4', type=str,
                     help='architecture of EfficientNet')
@@ -90,7 +89,12 @@ transform['val'] = transforms.Compose([
                           std=[0.229, 0.224, 0.225]),
      ])
 transform['test'] = transform['val'] 
-
+'''
+extract_images("001c62abd11fa4b57bf7a6c603a11bb9",
+    "/kaggle/input/prostate-cancer-grade-assessment/train_images",
+    256,
+    False)
+'''      
 def topk(X, n):
     x = np.zeros(n, dtype=int)
     y = np.zeros(n, dtype=int)
@@ -100,33 +104,26 @@ def topk(X, n):
         x_[ij] = 0
         x[i], y[i] = np.unravel_index(ij, X.shape)
     return x, y
-'''
-extract_images("001c62abd11fa4b57bf7a6c603a11bb9",
-    "/kaggle/input/prostate-cancer-grade-assessment/train_images",
-    256,
-    False)
-'''            
-def extract_images(img_id, img_dir, size, debug, mode):
+      
+def extract_images(img_id, img_dir, size, mode, debug=False):
     image_path = os.path.join(img_dir, img_id + '.tiff')
     image = openslide.OpenSlide(image_path)
     w0,h0 = image.level_dimensions[0]
-    thumbnail = invert(image.get_thumbnail((size,size)))  
+    view = (64,64)
+    thumbnail = invert(image.get_thumbnail(view))  
     img = np.array(thumbnail).mean(2)
     w1,h1 = thumbnail.size
-    im = PIL.Image.new('RGB',(size,size))
-    im.paste(thumbnail, (random.randrange(size+1-w1), random.randrange(size+1-h1)))
-    num =  {16:4, 32:4, 64:4, 128:4}
-    images = [im]
+    num =  {32:24}
+    images = []
+    if debug:
+        fig,ax = plt.subplots(1)
+        ax.imshow(img)
     for level, n in num.items():
-        r = size // level
+        r = 64 // level
         label = skimage.measure.block_reduce(img, (r,r), np.mean)
-        if debug:
-            plt.figure()
-            plt.imshow(label*255)
-
-        xs,ys = topk(label,level)
-        ll=list(range(level))
-        random.shuffle(ll)
+        xs,ys = topk(label,30)
+        ll=list(range(30))
+        if mode == 'train':random.shuffle(ll)
         ll = ll[:n]
         pts = [(x,y) for x,y in zip(xs[ll],ys[ll])]
         for x,y in pts:
@@ -134,12 +131,18 @@ def extract_images(img_id, img_dir, size, debug, mode):
             l = image.get_best_level_for_downsample(s0//(level*size))
             s = max(image.level_dimensions[l])
             ix,iy = x*s0//level , y*s0//level
+            crop_size = s//level
             if mode == 'train':
-                t = s0//level//2 - 1
+                t = s0//level//8
                 ix += random.randrange(-t, t)
                 iy += random.randrange(-t, t)
-            im = image.read_region((iy,ix), l, (s//level,s//level))        
-            im = invert(im.resize((size,size)).convert('RGB'))
+                crop_size = int(random.uniform(0.8*crop_size,1.2*crop_size))
+            im = image.read_region((iy,ix), l, (crop_size,crop_size))    
+           
+            if debug:
+                rect = patches.Rectangle((y*r,x*r),r,r,linewidth=1,edgecolor='r',facecolor='none')
+                ax.add_patch(rect)
+            im = im.resize((size,size)).convert('RGB')
             images += [im]
 
     if debug:
@@ -149,6 +152,8 @@ def extract_images(img_id, img_dir, size, debug, mode):
     
     return images
 
+
+provider_label = {"radboud":0., "karolinska":1.}
 class ProstateData(Dataset):
     def __init__(self, df, data_dir, mode, size, transform):
         self.img_dir = os.path.join(data_dir,"train_images")
@@ -161,43 +166,41 @@ class ProstateData(Dataset):
     
     def __getitem__(self, idx):
         img_id = self.df.iloc[idx].image_id
+        provider = self.df.iloc[idx].data_provider 
+        plab = provider_label[provider]
+        plab =  torch.tensor(plab, dtype=torch.float32, device="cpu"), 
         label = self.df.iloc[idx].isup_grade
-        images = extract_images(img_id, self.img_dir, self.size, False, self.mode)
-        image_tensor = None
-        for im in images:
-            tensor = self.transform(im).unsqueeze(0)
-            if image_tensor is None:
-                image_tensor = tensor
-            else:
-                image_tensor = torch.cat((image_tensor, tensor), dim=0)
-            
+        
+        images = extract_images(img_id, self.img_dir, self.size, self.mode)
+        image_tensor =torch.cat(
+                (self.transform(im).unsqueeze(0) for im in images),
+                dim=0)
         if self.mode == 'train' or self.mode == 'val':
-            return image_tensor, torch.tensor(label, dtype=torch.long, device="cpu")
+            return image_tensor, plab, torch.tensor(label, dtype=torch.long, device="cpu")
         else:
-            return image_tensor
+            return image_tensor, plab
 
 
 class Grader(nn.Module):
-    def __init__(self, n=256*3, o=nlabel):
+    def __init__(self, n=256, o=nlabel):
         super(Grader, self).__init__()
         self.n = n
         self.model = EfficientNet.from_pretrained(args.arch)
         self.model._fc = nn.Linear(self.model._fc.in_features, n*3)
         self.act = nn.GELU()
-        self.norm = nn.LayerNorm([17,n*3])
-        self.attention = MultiHeadAttention(n,8)
+        self.norm = nn.LayerNorm([17,n])
+        encoder_layer  = nn.TransformerEncoderLayer(n+1, 8)
+        self.attention = nn.TransformerEncoder(encoder_layer, num_layers=3)
         self.fc = nn.Linear(n,o)
-    def forward(self,x,size=args.size): # batch x 17 x size x size x 3
+    def forward(self,x,p): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
-        x = self.model(x.view(b*17, c, w, h))
-        x = x.view(b,17,-1)
-        x = self.norm(self.act(x)).view(b,17,3,-1)
-        q = x[:,:,0,:]
-        k = x[:,:,1,:]
-        v = x[:,:,2,:]
-        x = self.attention(q,k,v)
-        x = self.fc(x)
-        return x.mean(1)
+        x = self.model(x.view(b*n, c, w, h))
+        x = x.view(b,n,-1)
+        x = self.norm(self.act(x)).view(b,n,-1)
+        x = torch.cat((x,p),dim=-1)
+        x = self.attention(x)[:,0,:]
+        x = self.fc(x) # b x 1 x o 
+        return x
     
 def main():
     train_csv = pd.read_csv(os.path.join(args.root, "train.csv"))
@@ -215,31 +218,27 @@ def main():
     model = Grader()
     if torch.cuda.is_available():
         model=nn.DataParallel(model)
-        
-        
+
     if args.checkpoint:
         print('Resuming training from epoch {}, loading {}...'
               .format(args.resume_epoch,args.checkpoint))
         weight_file=os.path.join(args.root,args.checkpoint)
         model.load_state_dict(torch.load(weight_file,
                                  map_location=lambda storage, loc: storage))
-    
+    """
     model.to(device).half()
     for layer in model.modules():
         if isinstance(layer, nn.BatchNorm2d):
             layer.float()
-    
+    """
     num_class = np.array(train_csv.groupby('isup_grade').count().image_id)        
     class_weights = np.power(num_class.max()/num_class, 1.1)
     print("class weights:",class_weights)
     class_weights = torch.tensor(class_weights, dtype=torch.float16, device=device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
-    #optimizer = torch.optim.RMSprop(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
     
-    #scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 10], gamma=0.1)
-    #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer)
     for i in range(args.resume_epoch):
         scheduler.step()
     
@@ -255,25 +254,28 @@ def main():
             correct = 0
             nums = np.zeros(6,dtype=int)
             corrects = np.zeros(6,dtype=int)
+            props = np.zeros(6,dtype=int)
             running_loss=0
             preds = None
             truth = None
-            for i, (inputs, targets) in enumerate(loader[phase]):
-                inputs = inputs.to(device).half()          
+            for i, (img, plab, targets) in enumerate(loader[phase]):
+                img = img.to(device)
+                b, n, _, _, _ = img.shape
+                plab = plab.to(device).unsqueeze(-1).expand((b,n)).unsqueeze(-1)
                 targets= targets.to(device)
                 optimizer.zero_grad()
                 with torch.set_grad_enabled(phase == 'train'):
-                    output = model(inputs)
+                    output = model(img, plab)
                     loss = criterion(output, targets)
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
                     
-                    num += inputs.size(0)
+                    num += targets.size(0)
                     pred = output.argmax(dim=1)
                     #pred = output.max(1, keepdim=True)[1]
                     correct += pred.eq(targets).sum().item()
-                    running_loss += loss.item() * inputs.size(0)
+                    running_loss += loss.item() * targets.size(0)
                     acc = 100.0 * correct / num
                     if (i+1) % args.log_step == 0:
                         s = "({},{:.1f}s) Loss:{:.3f} Acc:{:.3f}" 
@@ -281,8 +283,10 @@ def main():
                     if phase == 'val':
                         for i in range(nlabel):
                             t = targets.eq(i)
+                            p = preds.eq(i)
                             nums[i] += t.sum().item()
-                            corrects[i] += (pred.eq(i)&t).sum().item()
+                            props[i] += p.sum().item()
+                            corrects[i] += (p&t).sum().item()
                             if preds is None:
                                 preds = pred.cpu().numpy()
                                 truth = targets.cpu().numpy()
@@ -291,8 +295,12 @@ def main():
                                 truth = np.concatenate((truth, targets.cpu().numpy()))
             if phase == 'val':
                 kappa = cohen_kappa_score(preds,truth)
+                recall = corrects/nums
+                precision = corrects/props
                 print("kappa:{:.3f},".format(kappa) +
-                    "|".join(["{}/{}".format(c,n) for c,n in zip(nums,corrects)]))
+                    "|".join(["{:.3f}".format(r) for r in zip(recall)]) +
+                    "|".join(["{:.3f}".format(p) for r in zip(precision)])
+                    )
                         
             if phase=="train":scheduler.step()
             if epoch % 1 == 0 and phase=="train":
