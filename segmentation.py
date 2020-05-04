@@ -177,7 +177,7 @@ def main():
                                  map_location=lambda storage, loc: storage))
     
     model.to(device)
-    criterion = FocalLoss(alpha = torch.tensor([1, 1.4, 8, 7, 6, 12],dtype=torch.float32,device=device))
+    criterion = FocalLoss(alpha = torch.tensor([1, 1.4, 6, 6, 5, 8],dtype=torch.float32,device=device))
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     
     for epoch in range(args.resume_epoch, args.epochs):
