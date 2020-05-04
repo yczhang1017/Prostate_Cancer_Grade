@@ -114,7 +114,7 @@ def main():
         os.mkdir(args.dump)
     
     model.eval()
-    
+    model.to(device)
     with torch.no_grad():
         t0 = time.time()
         for i, inputs in enumerate(loader):
@@ -131,9 +131,9 @@ def main():
             npix = np.prod(pred.shape)
             for i in range(nlabel):
                 pp[i] = pred.eq(i).sum().item() / npix
-            pp /= (pp[1:].sum())
+            pp = pp[1:]/(pp[1:].sum())
             t2 = time.time()
-            print("{:.1f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.1f}|{},{},{},{},{:.1f}s/{:.1f}s".format(
+            print("{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}|{},{},{},{},{:.1f}s/{:.1f}s".format(
                     *pp, grade, score, provider, imid, t2-t1, (t2-t0)/(i+1)))
             torch.save(pred, os.path.join(args.dump, imid))
 if __name__ == '__main__':
