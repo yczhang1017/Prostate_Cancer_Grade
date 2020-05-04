@@ -133,8 +133,8 @@ def main():
                 pp[i] = pred.eq(i).sum().item() / npix
             pp /= (pp[1:].sum())
             t2 = time.time()
-            print("{:.1f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.1f}|{},{},{},{}s/{}s".format(
-                    *pp, grade, score, provider, t2-t1, (t2-t0)/(i+1)))
+            print("{:.1f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.1f}|{},{},{},{},{:.1f}s/{:.1f}s".format(
+                    *pp, grade, score, provider, imid, t2-t1, (t2-t0)/(i+1)))
             torch.save(pred, os.path.join(args.dump, imid))
 if __name__ == '__main__':
         main()
