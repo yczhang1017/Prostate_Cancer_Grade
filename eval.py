@@ -27,19 +27,46 @@ parser.add_argument('--dump', default='dump/', type=str,
 parser.add_argument('--size', default=2048, type=int)
 
 args = parser.parse_args()
+
+def getp1(img):
+    h,w = img.shape
+    for i in range(h): 
+        if np.any(img[i,:]<255): break
+    for j in range(w): 
+        if np.any(img[:,j]<255): break
+    return i,j
+        
+                
+    return 0,0
+def getp2(img):
+    h,w = img.shape
+    for i in range(h-1,-1,-1): 
+        if np.any(img[i,:]<255): break
+    for j in range(w-1,-1,-1): 
+        if np.any(img[:,j]<255): break
+    return i,j
+
+def crop(image,size):
+    view = (256,256)
+    im = image.get_thumbnail(view)
+    img = np.array(im).mean(2)
+    i1,j1 = getp1(img)
+    i2,j2 = getp2(img)
+    h1,w1=img.shape   #size before crop
+    h2,w2 = i2-i1, j2-j1
+    r = h2/w2
+    hn = size * np.sqrt(r) * h1 // (i2-i1)
+    wn = size / np.sqrt(r) * w1 // (j2-j1)
+    im = image.get_thumbnail((wn,hn))
+    anchor = np.array((j1,i1,j2,i2))
+    anchor = anchor * hn // h1
+    return im.crop(anchor)
+
 def get_image(img_id, data_dir, size):
     image_path = os.path.join(data_dir, "train_images", img_id + '.tiff')
     image = openslide.OpenSlide(image_path)
     w0, h0 = image.dimensions
-    r = np.sqrt(h0/w0)
-    view = (int(size/r), int(size*r))
-    im = image.get_thumbnail(view)
-    im2 = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
-    ret,thresh = cv2.threshold(im2,254,255,cv2.THRESH_BINARY_INV)
-    contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-    x,y,w,h = cv2.boundingRect(cnt)
-    #mm = mask.get_thumbnail(view).getchannel(0)
-    return im#,mm
+    return crop(image,size)
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
