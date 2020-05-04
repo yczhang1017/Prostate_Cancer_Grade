@@ -109,8 +109,8 @@ def extract_images(img_id, img_dir, size, mode, debug=False):
     image_path = os.path.join(img_dir, img_id + '.tiff')
     image = openslide.OpenSlide(image_path)
     w0,h0 = image.level_dimensions[0]
-    view = (64,64)
-    thumbnail = invert(image.get_thumbnail(view))  
+    view = 64
+    thumbnail = invert(image.get_thumbnail(view,view))  
     img = np.array(thumbnail).mean(2)
     w1,h1 = thumbnail.size
     num =  {32:24}
@@ -119,7 +119,7 @@ def extract_images(img_id, img_dir, size, mode, debug=False):
         fig,ax = plt.subplots(1)
         ax.imshow(img)
     for level, n in num.items():
-        r = 64 // level
+        r = view // level
         label = skimage.measure.block_reduce(img, (r,r), np.mean)
         xs,ys = topk(label,30)
         ll=list(range(30))

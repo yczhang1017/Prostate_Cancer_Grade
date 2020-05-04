@@ -11,7 +11,6 @@ from torchvision import models
 from torch.utils.data import DataLoader,Dataset
 from torchvision.transforms import transforms
 import argparse
-import cv2
 
 parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
