@@ -9,7 +9,7 @@ from PIL.ImageOps import invert
 
 
 mode= 'train'
-size = 128
+size = 192
 img_id = "001c62abd11fa4b57bf7a6c603a11bb9"
 img_dir = "../train_images"
 

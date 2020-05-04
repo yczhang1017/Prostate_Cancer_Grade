@@ -33,7 +33,7 @@ parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
 parser.add_argument('--root', default='..',
                     type=str, help='directory of the data')
-parser.add_argument('--batch_size', default=8, type=int,
+parser.add_argument('--batch_size', default=3, type=int,
                     help='Batch size for training')
 parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
@@ -49,7 +49,7 @@ parser.add_argument('-c','--checkpoint', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('-r','--resume_epoch', default=0, type=int,
                     help='epoch number to be resumed at')
-parser.add_argument('-s','--size', default=128, type=int,
+parser.add_argument('-s','--size', default=192, type=int,
                     help='image size for training, divisible by 64')
 parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
@@ -64,7 +64,7 @@ args = parser.parse_args()
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
-    torch.set_default_tensor_type(torch.cuda.HalfTensor)
+    torch.set_default_tensor_type(torch.cuda.FloatTensor)
     torch.cuda.set_device(device)
     cudnn.benchmark = True
 else:
@@ -110,7 +110,7 @@ def extract_images(img_id, img_dir, size, mode, debug=False):
     image = openslide.OpenSlide(image_path)
     w0,h0 = image.level_dimensions[0]
     view = 64
-    thumbnail = invert(image.get_thumbnail(view,view))  
+    thumbnail = invert(image.get_thumbnail((view,view)))  
     img = np.array(thumbnail).mean(2)
     w1,h1 = thumbnail.size
     num =  {32:24}
@@ -168,12 +168,12 @@ class ProstateData(Dataset):
         img_id = self.df.iloc[idx].image_id
         provider = self.df.iloc[idx].data_provider 
         plab = provider_label[provider]
-        plab =  torch.tensor(plab, dtype=torch.float32, device="cpu"), 
+        plab =  torch.tensor(plab, dtype=torch.float32, device="cpu") 
         label = self.df.iloc[idx].isup_grade
         
         images = extract_images(img_id, self.img_dir, self.size, self.mode)
         image_tensor =torch.cat(
-                (self.transform(im).unsqueeze(0) for im in images),
+                [self.transform(im).unsqueeze(0) for im in images],
                 dim=0)
         if self.mode == 'train' or self.mode == 'val':
             return image_tensor, plab, torch.tensor(label, dtype=torch.long, device="cpu")
@@ -188,7 +188,7 @@ class Grader(nn.Module):
         self.model = EfficientNet.from_pretrained(args.arch)
         self.model._fc = nn.Linear(self.model._fc.in_features, n-1)
         self.act = nn.GELU()
-        self.norm = nn.LayerNorm([17,n-1])
+        self.norm = nn.LayerNorm([24,n-1])
         encoder_layer  = nn.TransformerEncoderLayer(n, 8)
         self.attention = nn.TransformerEncoder(encoder_layer, num_layers=2)
         self.fc = nn.Linear(n,o)
@@ -232,9 +232,9 @@ def main():
             layer.float()
     """
     num_class = np.array(train_csv.groupby('isup_grade').count().image_id)        
-    class_weights = np.power(num_class.max()/num_class, 1.1)
+    class_weights = np.power(num_class.max()/num_class, 1.)
     print("class weights:",class_weights)
-    class_weights = torch.tensor(class_weights, dtype=torch.float16, device=device)
+    class_weights = torch.tensor(class_weights, dtype=torch.float32, device=device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
