@@ -43,7 +43,7 @@ parser.add_argument('-e','--epochs', default=24, type=int,
                     help='number of epochs to train')
 parser.add_argument('-o','--output_folder', default='save/', type=str,
                     help='Dir to save results')
-parser.add_argument('-wd','--weight_decay', default=1e-5, type=float,
+parser.add_argument('-wd','--weight_decay', default=5e-5, type=float,
                     help='Weight decay')
 parser.add_argument('-c','--checkpoint', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
@@ -186,11 +186,11 @@ class Grader(nn.Module):
         super(Grader, self).__init__()
         self.n = n
         self.model = EfficientNet.from_pretrained(args.arch)
-        self.model._fc = nn.Linear(self.model._fc.in_features, n*3)
+        self.model._fc = nn.Linear(self.model._fc.in_features, n-1)
         self.act = nn.GELU()
-        self.norm = nn.LayerNorm([17,n])
-        encoder_layer  = nn.TransformerEncoderLayer(n+1, 8)
-        self.attention = nn.TransformerEncoder(encoder_layer, num_layers=3)
+        self.norm = nn.LayerNorm([17,n-1])
+        encoder_layer  = nn.TransformerEncoderLayer(n, 8)
+        self.attention = nn.TransformerEncoder(encoder_layer, num_layers=2)
         self.fc = nn.Linear(n,o)
     def forward(self,x,p): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
