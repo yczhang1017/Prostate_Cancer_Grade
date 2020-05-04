@@ -69,4 +69,5 @@ plt.savefig("p.png")
 
 for i,im in enumerate(images):
     plt.figure()
+    plt.imshow(im)
     plt.savefig(str(i)+".png")
