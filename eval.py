@@ -116,8 +116,9 @@ def main():
     model.eval()
     
     with torch.no_grad():
+        t0 = time.time()
         for i, inputs in enumerate(loader):
-            t0 = time.time()
+            t1 = time.time()
             imid = df.iloc[i].image_id
             provider =  df.iloc[i].data_provider
             grade = df.iloc[i].isup_grade
@@ -131,7 +132,9 @@ def main():
             for i in range(nlabel):
                 pp[i] = pred.eq(i).sum().item() / npix
             pp /= (pp[1:].sum())
-            print("{:.1f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.1f}|{},{},{},{}s".format(*pp, grade, score, provider, time.time()-t0))
+            t2 = time.time()
+            print("{:.1f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.1f}|{},{},{},{}s/{}s".format(
+                    *pp, grade, score, provider, t2-t1, (t2-t0)/(i+1)))
             torch.save(pred, os.path.join(args.dump, imid))
 if __name__ == '__main__':
         main()
