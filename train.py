@@ -190,7 +190,7 @@ class Grader(nn.Module):
         self.act = nn.GELU()
         self.norm = nn.LayerNorm([24,n-1])
         encoder_layer  = nn.TransformerEncoderLayer(n, 8)
-        self.attention = nn.TransformerEncoder(encoder_layer, num_layers=2)
+        self.attention = nn.TransformerEncoder(encoder_layer, num_layers=1)
         self.fc = nn.Linear(n,o)
     def forward(self,x,p): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
@@ -198,14 +198,14 @@ class Grader(nn.Module):
         x = x.view(b,n,-1)
         x = self.norm(self.act(x)).view(b,n,-1)
         x = torch.cat((x,p),dim=-1)
-        x = self.attention(x)[:,0,:]
+        x = self.attention(x)
         x = self.fc(x) # b x 1 x o 
-        return x
+        return x.mean(1)
     
 def main():
     train_csv = pd.read_csv(os.path.join(args.root, "train.csv"))
     df = {}
-    df['train'], df['val'] = train_test_split(train_csv, test_size=0.05, random_state=42)
+    df['train'], df['val'] = train_test_split(train_csv, stratify=train_df.isup_grade, test_size=0.05, random_state=42)
     dataset = {x: ProstateData(df[x], args.root, x, args.size, transform=transform[x]) 
                 for x in ['train', 'val']}
     loader={x: DataLoader(dataset[x],
