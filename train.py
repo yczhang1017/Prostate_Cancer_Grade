@@ -12,6 +12,7 @@ import matplotlib.patches as patches
 import random 
 import openslide
 import skimage.measure
+import PIL
 from PIL.ImageOps import invert
 
 from sklearn.model_selection import train_test_split
@@ -33,17 +34,17 @@ parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
 parser.add_argument('--root', default='..',
                     type=str, help='directory of the data')
-parser.add_argument('--batch_size', default=3, type=int,
+parser.add_argument('--batch_size', default=6, type=int,
                     help='Batch size for training')
 parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
-parser.add_argument('--lr', default=0.01, type=float,
+parser.add_argument('--lr', default=0.001, type=float,
                     help='initial learning rate')
 parser.add_argument('-e','--epochs', default=24, type=int,
                     help='number of epochs to train')
 parser.add_argument('-o','--output_folder', default='save/', type=str,
                     help='Dir to save results')
-parser.add_argument('-wd','--weight_decay', default=5e-5, type=float,
+parser.add_argument('-wd','--weight_decay', default=1e-5, type=float,
                     help='Weight decay')
 parser.add_argument('-c','--checkpoint', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
@@ -53,7 +54,7 @@ parser.add_argument('-s','--size', default=192, type=int,
                     help='image size for training, divisible by 64')
 parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
-parser.add_argument('--step', default=4, type=int,
+parser.add_argument('--step', default=3, type=int,
                     help='step to reduce lr')
 parser.add_argument('-a','--arch', default='efficientnet-b4', type=str,
                     help='architecture of EfficientNet')
@@ -64,7 +65,7 @@ args = parser.parse_args()
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
-    torch.set_default_tensor_type(torch.cuda.FloatTensor)
+    torch.set_default_tensor_type(torch.cuda.HalfTensor)
     torch.cuda.set_device(device)
     cudnn.benchmark = True
 else:
@@ -109,20 +110,22 @@ def extract_images(img_id, img_dir, size, mode, debug=False):
     image_path = os.path.join(img_dir, img_id + '.tiff')
     image = openslide.OpenSlide(image_path)
     w0,h0 = image.level_dimensions[0]
-    view = 64
+    view = size
     thumbnail = invert(image.get_thumbnail((view,view)))  
     img = np.array(thumbnail).mean(2)
     w1,h1 = thumbnail.size
-    num =  {32:24}
-    images = []
+    im = PIL.Image.new('RGB',(size,size))
+    im.paste(thumbnail, (random.randrange(size+1-w1), random.randrange(size+1-h1)))
+    num =  {16:8, 32:8, 64:8}
+    images = [im]
     if debug:
         fig,ax = plt.subplots(1)
         ax.imshow(img)
     for level, n in num.items():
         r = view // level
         label = skimage.measure.block_reduce(img, (r,r), np.mean)
-        xs,ys = topk(label,30)
-        ll=list(range(30))
+        xs,ys = topk(label,level)
+        ll=list(range(level))
         if mode == 'train':random.shuffle(ll)
         ll = ll[:n]
         pts = [(x,y) for x,y in zip(xs[ll],ys[ll])]
@@ -133,7 +136,7 @@ def extract_images(img_id, img_dir, size, mode, debug=False):
             ix,iy = x*s0//level , y*s0//level
             crop_size = s//level
             if mode == 'train':
-                t = s0//level//8
+                t = s0//level//4
                 ix += random.randrange(-t, t)
                 iy += random.randrange(-t, t)
                 crop_size = int(random.uniform(0.8*crop_size,1.2*crop_size))
@@ -142,7 +145,7 @@ def extract_images(img_id, img_dir, size, mode, debug=False):
             if debug:
                 rect = patches.Rectangle((y*r,x*r),r,r,linewidth=1,edgecolor='r',facecolor='none')
                 ax.add_patch(rect)
-            im = im.resize((size,size)).convert('RGB')
+            im = im.resize((size,size),PIL.Image.BILINEAR).convert('RGB')
             images += [im]
 
     if debug:
@@ -182,30 +185,34 @@ class ProstateData(Dataset):
 
 
 class Grader(nn.Module):
-    def __init__(self, n=256, o=nlabel):
+    def __init__(self, n=1001, o=nlabel):
         super(Grader, self).__init__()
         self.n = n
         self.model = EfficientNet.from_pretrained(args.arch)
-        self.model._fc = nn.Linear(self.model._fc.in_features, n-1)
+        #self.model._fc = nn.Linear(self.model._fc.in_features, n-1)
         self.act = nn.GELU()
-        self.norm = nn.LayerNorm([24,n-1])
-        encoder_layer  = nn.TransformerEncoderLayer(n, 8)
-        self.attention = nn.TransformerEncoder(encoder_layer, num_layers=1)
-        self.fc = nn.Linear(n,o)
+        self.norm1 = nn.LayerNorm([25,n-1])
+        #encoder_layer  = nn.TransformerEncoderLayer(n, 8)
+        #self.attention = nn.TransformerEncoder(encoder_layer, num_layers=1)
+        self.fc1 = nn.Linear(n,o)
+        self.norm2 = nn.LayerNorm([25,6])
+        self.fc2 = nn.Linear(25,1)
     def forward(self,x,p): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         x = self.model(x.view(b*n, c, w, h))
         x = x.view(b,n,-1)
-        x = self.norm(self.act(x)).view(b,n,-1)
+        x = self.norm1(self.act(x)).view(b,n,-1)
         x = torch.cat((x,p),dim=-1)
-        x = self.attention(x)
-        x = self.fc(x) # b x 1 x o 
-        return x.mean(1)
+        #x = self.attention(x)
+        x = self.fc1(x) # b x 1 x o 
+        x = self.norm2(self.act(x))
+        x = self.fc2(x.permute(0,2,1)).squeeze()
+        return x
     
 def main():
     train_csv = pd.read_csv(os.path.join(args.root, "train.csv"))
     df = {}
-    df['train'], df['val'] = train_test_split(train_csv, stratify=train_df.isup_grade, test_size=0.05, random_state=42)
+    df['train'], df['val'] = train_test_split(train_csv, stratify= train_csv.isup_grade, test_size=0.05, random_state=42)
     dataset = {x: ProstateData(df[x], args.root, x, args.size, transform=transform[x]) 
                 for x in ['train', 'val']}
     loader={x: DataLoader(dataset[x],
@@ -225,16 +232,16 @@ def main():
         weight_file=os.path.join(args.root,args.checkpoint)
         model.load_state_dict(torch.load(weight_file,
                                  map_location=lambda storage, loc: storage))
-    """
+    
     model.to(device).half()
     for layer in model.modules():
         if isinstance(layer, nn.BatchNorm2d):
             layer.float()
-    """
+    
     num_class = np.array(train_csv.groupby('isup_grade').count().image_id)        
     class_weights = np.power(num_class.max()/num_class, 1.)
     print("class weights:",class_weights)
-    class_weights = torch.tensor(class_weights, dtype=torch.float32, device=device)
+    class_weights = torch.tensor(class_weights, dtype=torch.float16, device=device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
@@ -243,7 +250,7 @@ def main():
         scheduler.step()
     
     for epoch in range(args.resume_epoch, args.epochs):
-        for phase in ['train','val']:
+        for phase in ['train', 'val']:
             t0 = time.time()
             print("========={}:{}=========".format(phase,epoch))
             if phase == 'train':
@@ -259,9 +266,9 @@ def main():
             preds = None
             truth = None
             for i, (img, plab, targets) in enumerate(loader[phase]):
-                img = img.to(device)
+                img = img.to(device).half()
                 b, n, _, _, _ = img.shape
-                plab = plab.to(device).unsqueeze(-1).expand((b,n)).unsqueeze(-1)
+                plab = plab.to(device).half().unsqueeze(-1).expand((b,n)).unsqueeze(-1)
                 targets= targets.to(device)
                 optimizer.zero_grad()
                 with torch.set_grad_enabled(phase == 'train'):
@@ -283,7 +290,7 @@ def main():
                     if phase == 'val':
                         for i in range(nlabel):
                             t = targets.eq(i)
-                            p = preds.eq(i)
+                            p = pred.eq(i)
                             nums[i] += t.sum().item()
                             props[i] += p.sum().item()
                             corrects[i] += (p&t).sum().item()
@@ -298,8 +305,8 @@ def main():
                 recall = corrects/nums
                 precision = corrects/props
                 print("kappa:{:.3f},".format(kappa) +
-                    "|".join(["{:.3f}".format(r) for r in zip(recall)]) +
-                    "|".join(["{:.3f}".format(p) for r in zip(precision)])
+                    "|".join(["{:.3f}".format(r) for r in recall]) +"\n\t"+
+                    "|".join(["{:.3f}".format(p) for p in precision])
                     )
                         
             if phase=="train":scheduler.step()
