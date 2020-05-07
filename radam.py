@@ -515,7 +515,7 @@ class Ralamb(Optimizer):
 
                 # Decay the first and second moment running average coefficient
                 # m_t
-                exp_avg.mul_(beta1).add_(grad, alpha = 1 - beta1)
+                exp_avg.mul_(beta1).add_(1 - beta1, grad)
                 # v_t
                 exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
 
@@ -557,7 +557,7 @@ class Ralamb(Optimizer):
                     denom = exp_avg_sq.sqrt().add_(group['eps'])
                     p_data_fp32.addcdiv_(-radam_step * trust_ratio, exp_avg, denom)
                 else:
-                    p_data_fp32.add_(exp_avg, alpha = -radam_step * trust_ratio)
+                    p_data_fp32.add_(-radam_step * trust_ratio, exp_avg)
 
                 p.data.copy_(p_data_fp32)
 
