@@ -34,11 +34,11 @@ parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
 parser.add_argument('--root', default='..',
                     type=str, help='directory of the data')
-parser.add_argument('--batch_size', default=6, type=int,
+parser.add_argument('--batch_size', default=12, type=int,
                     help='Batch size for training')
 parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
-parser.add_argument('--lr', default=0.001, type=float,
+parser.add_argument('--lr', default=0.01, type=float,
                     help='initial learning rate')
 parser.add_argument('-e','--epochs', default=24, type=int,
                     help='number of epochs to train')
@@ -50,13 +50,13 @@ parser.add_argument('-c','--checkpoint', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('-r','--resume_epoch', default=0, type=int,
                     help='epoch number to be resumed at')
-parser.add_argument('-s','--size', default=192, type=int,
+parser.add_argument('-s','--size', default=128, type=int,
                     help='image size for training, divisible by 64')
 parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
-parser.add_argument('--step', default=3, type=int,
+parser.add_argument('--step', default=6, type=int,
                     help='step to reduce lr')
-parser.add_argument('-a','--arch', default='efficientnet-b4', type=str,
+parser.add_argument('-a','--arch', default='resnext50_32x4d', type=str,
                     help='architecture of EfficientNet')
 
 args = parser.parse_args()
@@ -145,7 +145,7 @@ def extract_images(img_id, img_dir, size, mode, debug=False):
             if debug:
                 rect = patches.Rectangle((y*r,x*r),r,r,linewidth=1,edgecolor='r',facecolor='none')
                 ax.add_patch(rect)
-            im = im.resize((size,size),PIL.Image.BILINEAR).convert('RGB')
+            im = invert(im.resize((size,size),PIL.Image.BILINEAR).convert('RGB'))
             images += [im]
 
     if debug:
@@ -183,20 +183,32 @@ class ProstateData(Dataset):
         else:
             return image_tensor, plab
 
+class AdaptiveConcatPool2d(nn.Module):
+    def __init__(self, sz=None):
+        super().__init__()
+        sz = sz or (1,1)
+        self.ap = nn.AdaptiveAvgPool2d(sz)
+        self.mp = nn.AdaptiveMaxPool2d(sz)
+    def forward(self, x): return torch.cat([self.mp(x), self.ap(x)], 1)
 
 class Grader(nn.Module):
     def __init__(self, n=1001, o=nlabel):
         super(Grader, self).__init__()
         self.n = n
-        self.model = EfficientNet.from_pretrained(args.arch)
-        #self.model._fc = nn.Linear(self.model._fc.in_features, n-1)
+        if args.arch.startswith('efficientnet'):
+            self.model = EfficientNet.from_pretrained(args.arch)
+            if n!=1001: self.model._fc = nn.Linear(self.model._fc.in_features, n-1) 
+        else: 
+            self.model = torch.hub.load('pytorch/vision:v0.6.0', args.arch, pretrained=True)
+            if n!= 1001: self.model.fc = nn.Linear(self.model.fc.in_features, n-1)
+        
         self.act = nn.GELU()
         self.norm1 = nn.LayerNorm([25,n-1])
         #encoder_layer  = nn.TransformerEncoderLayer(n, 8)
         #self.attention = nn.TransformerEncoder(encoder_layer, num_layers=1)
         self.fc1 = nn.Linear(n,o)
-        self.norm2 = nn.LayerNorm([25,6])
-        self.fc2 = nn.Linear(25,1)
+        #self.norm2 = nn.LayerNorm([25,6])
+        #self.fc2 = nn.Linear(25,1)
     def forward(self,x,p): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         x = self.model(x.view(b*n, c, w, h))
@@ -204,10 +216,10 @@ class Grader(nn.Module):
         x = self.norm1(self.act(x)).view(b,n,-1)
         x = torch.cat((x,p),dim=-1)
         #x = self.attention(x)
-        x = self.fc1(x) # b x 1 x o 
-        x = self.norm2(self.act(x))
-        x = self.fc2(x.permute(0,2,1)).squeeze()
-        return x
+        x = self.fc1(x) # b x 25 x o 
+        #x = self.norm2(self.act(x))
+        #x = self.fc2(x.permute(0,2,1)).squeeze()
+        return x.mean(1)
     
 def main():
     train_csv = pd.read_csv(os.path.join(args.root, "train.csv"))
