@@ -72,28 +72,32 @@ class ResGrader(nn.Module):
         
 
 class Grader(nn.Module):
-    def __init__(self, arch, n=1001, o=nlabel):
+    def __init__(self, arch, n=256, o=nlabel):
         super(Grader, self).__init__()
         self.n = n
         self.model = EfficientNet.from_pretrained(arch)
-        if n!=1001: self.model._fc = nn.Linear(self.model._fc.in_features, n-1) 
-        
-        self.act = nn.GELU()
-        self.norm1 = nn.LayerNorm([25,n-1])
-        #encoder_layer  = nn.TransformerEncoderLayer(n, 8)
-        #self.attention = nn.TransformerEncoder(encoder_layer, num_layers=1)
+        self.model._avg_pooling = AdaptiveConcatPool2d()
+        nc = self.model._fc.in_features
+        self.norm1 = nn.LayerNorm([25,2*nc])
+        self.act = Mish()
+        self.model._fc = nn.Linear(nc*2+1, n) 
+        encoder_layer  = nn.TransformerEncoderLayer(n, 8)
+        self.attention = nn.TransformerEncoder(encoder_layer, num_layers=1)
+        self.norm2 = nn.LayerNorm([25,n])
         self.fc1 = nn.Linear(n,o)
-        #self.norm2 = nn.LayerNorm([25,6])
+        #self.norm2 = nn.LayerNorm([25,n])
         #self.fc2 = nn.Linear(25,1)
     def forward(self,x,p): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
-        x = self.model(x.view(b*n, c, w, h))
+        x = self.model.extract_features(x.view(b*n, c, w, h))
+        x = self.model._avg_pooling(x)
         x = x.view(b,n,-1)
-        x = self.norm1(self.act(x)).view(b,n,-1)
+        x = self.act(self.norm1(x)).view(b,n,-1)
+        p = p.expand((b,n)).unsqueeze(-1)
         x = torch.cat((x,p),dim=-1)
-        #x = self.attention(x)
-        x = self.fc1(x) # b x 25 x o 
-        #x = self.norm2(self.act(x))
+        x = self.model._fc(x) # b x 25 x o 
+        x = self.attention(x)
+        x = self.fc1(self.act(self.norm2(x)))
         #x = self.fc2(x.permute(0,2,1)).squeeze()
         return x.mean(1)
     
