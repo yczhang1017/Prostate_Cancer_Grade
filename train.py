@@ -248,7 +248,7 @@ def main():
             for i, (img, plab, targets) in enumerate(loader[phase]):
                 img = img.to(device)
                 b, n, _, _, _ = img.shape
-                plab = plab.to(device).unsqueeze(-1).expand((b,n)).unsqueeze(-1)
+                plab = plab.to(device).unsqueeze(-1)
                 targets= targets.to(device)
                 optimizer.zero_grad()
                 with torch.set_grad_enabled(phase == 'train'):
