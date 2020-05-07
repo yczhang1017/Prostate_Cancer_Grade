@@ -52,7 +52,7 @@ class ResGrader(nn.Module):
         self.enc = nn.Sequential(*list(m.children())[:-2])       
         nc = list(m.children())[-1].in_features 
         self.head = nn.Sequential(AdaptiveConcatPool2d(),Flatten())
-        self.head2 = nn.Sequential(nn.Linear(2*nc,n),
+        self.head2 = nn.Sequential(nn.Linear(2*nc+1,n),
                             Mish(),nn.BatchNorm1d(n), nn.Dropout(0.5),nn.Linear(512,o))
     def forward(self, x, p):
         b, n, c, w, h = x.shape
