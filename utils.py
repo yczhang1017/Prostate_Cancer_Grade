@@ -40,14 +40,18 @@ def to_Mish(model):
             to_Mish(child)
 
 
-
+class Flatten(torch.nn.Module):
+    def forward(self, x):
+        batch_size = x.shape[0]
+        return x.view(batch_size, -1)
+    
 class ResGrader(nn.Module):
     def __init__(self, arch, n =512, o=nlabel):
         super().__init__()
         m = torch.hub.load('facebookresearch/semi-supervised-ImageNet1K-models', arch)
         self.enc = nn.Sequential(*list(m.children())[:-2])       
         nc = list(m.children())[-1].in_features 
-        self.head = nn.Sequential(AdaptiveConcatPool2d(),torch.flatten())
+        self.head = nn.Sequential(AdaptiveConcatPool2d(),Flatten())
         self.head2 = nn.Sequential(nn.Linear(2*nc,n),
                             Mish(),nn.BatchNorm1d(n), nn.Dropout(0.5),nn.Linear(512,o))
     def forward(self, x, p):
