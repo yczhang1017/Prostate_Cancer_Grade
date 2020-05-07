@@ -22,7 +22,7 @@ import torch.optim as optim
 
 from sklearn.metrics import cohen_kappa_score
 from utils import ResGrader, Grader
-
+from radam import Over9000
 
 def set_seed(seed):
     random.seed(seed)
@@ -34,11 +34,11 @@ parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
 parser.add_argument('--root', default='..',
                     type=str, help='directory of the data')
-parser.add_argument('--batch_size', default=12, type=int,
+parser.add_argument('--batch_size', default=16, type=int,
                     help='Batch size for training')
 parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
-parser.add_argument('--lr', default=0.01, type=float,
+parser.add_argument('--lr', default=0.001, type=float,
                     help='initial learning rate')
 parser.add_argument('-e','--epochs', default=16, type=int,
                     help='number of epochs to train')
@@ -185,9 +185,6 @@ class ProstateData(Dataset):
             return image_tensor, plab
 
 
-
-
-
     
 def main():
     train_csv = pd.read_csv(os.path.join(args.root, "train.csv"))
@@ -223,12 +220,11 @@ def main():
     print("class weights:",class_weights)
     class_weights = torch.tensor(class_weights, dtype=torch.float32, device=device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
-    optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+    #optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+    optimizer = Over9000(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
-    
     for i in range(args.resume_epoch):
         scheduler.step()
-    
     for epoch in range(args.resume_epoch, args.epochs):
         for phase in ['train', 'val']:
             t0 = time.time()
@@ -281,7 +277,7 @@ def main():
                                 preds = np.concatenate((preds, pred.cpu().numpy()))
                                 truth = np.concatenate((truth, targets.cpu().numpy()))
             if phase == 'val':
-                kappa = cohen_kappa_score(preds,truth)
+                kappa = cohen_kappa_score(preds,truth,weights='quadratic')
                 recall = corrects/nums
                 precision = corrects/props
                 print("kappa:{:.3f},".format(kappa) +
