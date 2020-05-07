@@ -434,9 +434,9 @@ from torch.optim import Optimizer, Adam
 class Lookahead(Optimizer):
     def __init__(self, base_optimizer,alpha=0.5, k=6):
         if not 0.0 <= alpha <= 1.0:
-            raise ValueError(f'Invalid slow update rate: {alpha}')
+            raise ValueError('Invalid slow update rate')
         if not 1 <= k:
-            raise ValueError(f'Invalid lookahead steps: {k}')
+            raise ValueError('Invalid lookahead steps')
         self.optimizer = base_optimizer
         self.param_groups = self.optimizer.param_groups
         self.alpha = alpha
