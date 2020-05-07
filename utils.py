@@ -86,6 +86,7 @@ class Grader(nn.Module):
         #self.fc2 = nn.Linear(25,1)
     def forward(self,x,p): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
+        p = p.expand((b,n)).unsqueeze(-1)
         x = self.model(x.view(b*n, c, w, h))
         x = x.view(b,n,-1)
         x = self.norm1(self.act(x)).view(b,n,-1)
