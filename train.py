@@ -20,10 +20,10 @@ from torchvision.transforms import transforms
 from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 
-#import pretrainedmodels
-from efficientnet_pytorch import EfficientNet
 from sklearn.metrics import cohen_kappa_score
-    
+from utils import ResGrader, Grader
+
+
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -40,7 +40,7 @@ parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
 parser.add_argument('--lr', default=0.01, type=float,
                     help='initial learning rate')
-parser.add_argument('-e','--epochs', default=24, type=int,
+parser.add_argument('-e','--epochs', default=16, type=int,
                     help='number of epochs to train')
 parser.add_argument('-o','--output_folder', default='save/', type=str,
                     help='Dir to save results')
@@ -56,7 +56,7 @@ parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
 parser.add_argument('--step', default=6, type=int,
                     help='step to reduce lr')
-parser.add_argument('-a','--arch', default='resnext50_32x4d', type=str,
+parser.add_argument('-a','--arch', default='resnext50_32x4d_swsl', type=str,
                     help='architecture of EfficientNet')
 
 args = parser.parse_args()
@@ -65,7 +65,7 @@ args = parser.parse_args()
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
-    torch.set_default_tensor_type(torch.cuda.HalfTensor)
+    torch.set_default_tensor_type(torch.cuda.FloatTensor)
     torch.cuda.set_device(device)
     cudnn.benchmark = True
 else:
@@ -80,6 +80,7 @@ transform = {}
 transform['train'] = transforms.Compose([
      transforms.RandomVerticalFlip(),
      transforms.RandomHorizontalFlip(),
+     transforms.RandomRotation(10),
      transforms.ToTensor(),
      transforms.Normalize(mean=[0.485, 0.456, 0.406],
                           std=[0.229, 0.224, 0.225]),
@@ -116,7 +117,7 @@ def extract_images(img_id, img_dir, size, mode, debug=False):
     w1,h1 = thumbnail.size
     im = PIL.Image.new('RGB',(size,size))
     im.paste(thumbnail, (random.randrange(size+1-w1), random.randrange(size+1-h1)))
-    num =  {16:8, 32:8, 64:8}
+    num =  {16:8, 32:12}
     images = [im]
     if debug:
         fig,ax = plt.subplots(1)
@@ -183,43 +184,10 @@ class ProstateData(Dataset):
         else:
             return image_tensor, plab
 
-class AdaptiveConcatPool2d(nn.Module):
-    def __init__(self, sz=None):
-        super().__init__()
-        sz = sz or (1,1)
-        self.ap = nn.AdaptiveAvgPool2d(sz)
-        self.mp = nn.AdaptiveMaxPool2d(sz)
-    def forward(self, x): return torch.cat([self.mp(x), self.ap(x)], 1)
 
-class Grader(nn.Module):
-    def __init__(self, n=1001, o=nlabel):
-        super(Grader, self).__init__()
-        self.n = n
-        if args.arch.startswith('efficientnet'):
-            self.model = EfficientNet.from_pretrained(args.arch)
-            if n!=1001: self.model._fc = nn.Linear(self.model._fc.in_features, n-1) 
-        else: 
-            self.model = torch.hub.load('pytorch/vision:v0.6.0', args.arch, pretrained=True)
-            if n!= 1001: self.model.fc = nn.Linear(self.model.fc.in_features, n-1)
-        
-        self.act = nn.GELU()
-        self.norm1 = nn.LayerNorm([25,n-1])
-        #encoder_layer  = nn.TransformerEncoderLayer(n, 8)
-        #self.attention = nn.TransformerEncoder(encoder_layer, num_layers=1)
-        self.fc1 = nn.Linear(n,o)
-        #self.norm2 = nn.LayerNorm([25,6])
-        #self.fc2 = nn.Linear(25,1)
-    def forward(self,x,p): # batch x 17 x size x size x 3
-        b, n, c, w, h = x.shape
-        x = self.model(x.view(b*n, c, w, h))
-        x = x.view(b,n,-1)
-        x = self.norm1(self.act(x)).view(b,n,-1)
-        x = torch.cat((x,p),dim=-1)
-        #x = self.attention(x)
-        x = self.fc1(x) # b x 25 x o 
-        #x = self.norm2(self.act(x))
-        #x = self.fc2(x.permute(0,2,1)).squeeze()
-        return x.mean(1)
+
+
+
     
 def main():
     train_csv = pd.read_csv(os.path.join(args.root, "train.csv"))
@@ -234,7 +202,11 @@ def main():
                           pin_memory=True)
                   for x in ['train', 'val']}
     
-    model = Grader()
+    
+    if args.arch.startswith('efficientnet'):
+        model = Grader(args.arch)
+    if args.arch.startswith('resnext'):
+        model = ResGrader(args.arch)
     if torch.cuda.is_available():
         model=nn.DataParallel(model)
 
@@ -245,15 +217,11 @@ def main():
         model.load_state_dict(torch.load(weight_file,
                                  map_location=lambda storage, loc: storage))
     
-    model.to(device).half()
-    for layer in model.modules():
-        if isinstance(layer, nn.BatchNorm2d):
-            layer.float()
-    
+    model.to(device)
     num_class = np.array(train_csv.groupby('isup_grade').count().image_id)        
     class_weights = np.power(num_class.max()/num_class, 1.)
     print("class weights:",class_weights)
-    class_weights = torch.tensor(class_weights, dtype=torch.float16, device=device)
+    class_weights = torch.tensor(class_weights, dtype=torch.float32, device=device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
@@ -278,9 +246,9 @@ def main():
             preds = None
             truth = None
             for i, (img, plab, targets) in enumerate(loader[phase]):
-                img = img.to(device).half()
+                img = img.to(device)
                 b, n, _, _, _ = img.shape
-                plab = plab.to(device).half().unsqueeze(-1).expand((b,n)).unsqueeze(-1)
+                plab = plab.to(device).unsqueeze(-1).expand((b,n)).unsqueeze(-1)
                 targets= targets.to(device)
                 optimizer.zero_grad()
                 with torch.set_grad_enabled(phase == 'train'):
