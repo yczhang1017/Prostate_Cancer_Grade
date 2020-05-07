@@ -117,8 +117,8 @@ def extract_images(img_id, img_dir, size, mode, debug=False):
     w1,h1 = thumbnail.size
     im = PIL.Image.new('RGB',(size,size))
     im.paste(thumbnail, (random.randrange(size+1-w1), random.randrange(size+1-h1)))
-    num =  {16:8, 32:16}
-    images = []
+    num =  {16:8, 32:12, 64:4}
+    images = [im]
     if debug:
         fig,ax = plt.subplots(1)
         ax.imshow(img)
