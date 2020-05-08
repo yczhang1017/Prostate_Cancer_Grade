@@ -21,7 +21,7 @@ from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 
 from sklearn.metrics import cohen_kappa_score
-from utils import ResGrader, Grader, toHalf
+from utils import ResGrader, Grader
 from radam import Over9000
 
 def set_seed(seed):
@@ -232,8 +232,8 @@ def main():
     print("class weights:",class_weights)
     class_weights = torch.tensor(class_weights, dtype=wtype, device=device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
-    optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
-    #optimizer = Over9000(model.parameters(), lr=args.lr)
+    #optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+    optimizer = Over9000(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
     for i in range(args.resume_epoch):
         scheduler.step()
@@ -259,8 +259,8 @@ def main():
                 plab = plab.to(device).unsqueeze(-1)
                 targets= targets.to(device)
                 if args.fp16:
-                    img.half()
-                    plab.half()
+                    img = img.half()
+                    plab = plab.half()
                 optimizer.zero_grad()
                 with torch.set_grad_enabled(phase == 'train'):
                     output = model(img, plab)
