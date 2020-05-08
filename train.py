@@ -56,9 +56,8 @@ parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
 parser.add_argument('--step', default=4, type=int,
                     help='step to reduce lr')
-parser.add_argument('-a','--arch', default='resnext50_32x4d_swsl', choices=['efficientnet-b4', 'resnext50_32x4d_swsl'],
+parser.add_argument('-a','--arch', default='efficientnet-b4', choices=['efficientnet-b4', 'resnext50_32x4d_swsl'],
                     help='architecture of EfficientNet')
-
 args = parser.parse_args()
 
 
@@ -117,7 +116,7 @@ def extract_images(img_id, img_dir, size, mode, debug=False):
     w1,h1 = thumbnail.size
     im = PIL.Image.new('RGB',(size,size))
     im.paste(thumbnail, (random.randrange(size+1-w1), random.randrange(size+1-h1)))
-    num =  {16:8, 32:12, 64:4}
+    num =  {16:8, 32:8, 64:8}
     images = [im]
     if debug:
         fig,ax = plt.subplots(1)
@@ -210,7 +209,7 @@ def main():
     if args.checkpoint:
         print('Resuming training from epoch {}, loading {}...'
               .format(args.resume_epoch,args.checkpoint))
-        weight_file=os.path.join(args.root,args.checkpoint)
+        weight_file=os.path.join(args.checkpoint)
         model.load_state_dict(torch.load(weight_file,
                                  map_location=lambda storage, loc: storage))
     
@@ -220,8 +219,8 @@ def main():
     print("class weights:",class_weights)
     class_weights = torch.tensor(class_weights, dtype=torch.float32, device=device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
-    #optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
-    optimizer = Over9000(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+    #optimizer = Over9000(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
     for i in range(args.resume_epoch):
         scheduler.step()
