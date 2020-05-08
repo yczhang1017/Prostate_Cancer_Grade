@@ -87,7 +87,6 @@ transform = {}
 transform['train'] = transforms.Compose([
      transforms.RandomVerticalFlip(),
      transforms.RandomHorizontalFlip(),
-     transforms.RandomRotation(10),
      transforms.ToTensor(),
      transforms.Normalize(mean=[0.485, 0.456, 0.406],
                           std=[0.229, 0.224, 0.225]),
