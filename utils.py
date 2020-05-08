@@ -95,7 +95,7 @@ class Grader(nn.Module):
         x = self.fc1(x) # b x 25 x o 
         x = self.norm2(self.act(x))
         x = self.fc2(x.permute(0,2,1)).squeeze()
-        return x.mean(1)
+        return x
 """
 class Grader(nn.Module):
     def __init__(self, arch, n=256, o=nlabel):
