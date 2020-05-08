@@ -232,8 +232,8 @@ def main():
     print("class weights:",class_weights)
     class_weights = torch.tensor(class_weights, dtype=wtype, device=device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
-    #optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
-    optimizer = Over9000(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+    #optimizer = Over9000(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
     for i in range(args.resume_epoch):
         scheduler.step()
