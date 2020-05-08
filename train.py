@@ -21,7 +21,7 @@ from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 
 from sklearn.metrics import cohen_kappa_score
-from utils import ResGrader, Grader
+from utils import ResGrader, Grader, toHalf
 from radam import Over9000
 
 def set_seed(seed):
@@ -34,11 +34,11 @@ parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
 parser.add_argument('--root', default='..',
                     type=str, help='directory of the data')
-parser.add_argument('--batch_size', default=12, type=int,
+parser.add_argument('--batch_size', default=6, type=int,
                     help='Batch size for training')
 parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
-parser.add_argument('--lr', default=0.001, type=float,
+parser.add_argument('--lr', default=0.01, type=float,
                     help='initial learning rate')
 parser.add_argument('-e','--epochs', default=16, type=int,
                     help='number of epochs to train')
@@ -50,7 +50,7 @@ parser.add_argument('-c','--checkpoint', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('-r','--resume_epoch', default=0, type=int,
                     help='epoch number to be resumed at')
-parser.add_argument('-s','--size', default=128, type=int,
+parser.add_argument('-s','--size', default=192, type=int,
                     help='image size for training, divisible by 64')
 parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
@@ -58,13 +58,19 @@ parser.add_argument('--step', default=4, type=int,
                     help='step to reduce lr')
 parser.add_argument('-a','--arch', default='efficientnet-b4', choices=['efficientnet-b4', 'resnext50_32x4d_swsl'],
                     help='architecture of EfficientNet')
+parser.add_argument('--fp16', action='store_false')
+
+
 args = parser.parse_args()
 
 
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
-    torch.set_default_tensor_type(torch.cuda.FloatTensor)
+    if args.fp16: 
+        torch.set_default_tensor_type(torch.cuda.HalfTensor)
+    else:
+        torch.set_default_tensor_type(torch.cuda.FloatTensor)
     torch.cuda.set_device(device)
     cudnn.benchmark = True
 else:
@@ -214,6 +220,7 @@ def main():
                                  map_location=lambda storage, loc: storage))
     
     model.to(device)
+    if args.fp16: toHalf(model)
     num_class = np.array(train_csv.groupby('isup_grade').count().image_id)        
     class_weights = np.power(num_class.max()/num_class, 1.)
     print("class weights:",class_weights)
@@ -245,6 +252,9 @@ def main():
                 b, n, _, _, _ = img.shape
                 plab = plab.to(device).unsqueeze(-1)
                 targets= targets.to(device)
+                if args.fp16:
+                    img.half()
+                    plab.half()
                 optimizer.zero_grad()
                 with torch.set_grad_enabled(phase == 'train'):
                     output = model(img, plab)

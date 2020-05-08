@@ -82,8 +82,8 @@ class Grader(nn.Module):
         #encoder_layer  = nn.TransformerEncoderLayer(n, 8)
         #self.attention = nn.TransformerEncoder(encoder_layer, num_layers=1)
         self.fc1 = nn.Linear(n,o)
-        #self.norm2 = nn.LayerNorm([25,6])
-        #self.fc2 = nn.Linear(25,1)
+        self.norm2 = nn.LayerNorm([25,6])
+        self.fc2 = nn.Linear(25,1)
     def forward(self,x,p): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
         p = p.expand((b,n)).unsqueeze(-1)
@@ -93,8 +93,8 @@ class Grader(nn.Module):
         x = torch.cat((x,p),dim=-1)
         #x = self.attention(x)
         x = self.fc1(x) # b x 25 x o 
-        #x = self.norm2(self.act(x))
-        #x = self.fc2(x.permute(0,2,1)).squeeze()
+        x = self.norm2(self.act(x))
+        x = self.fc2(x.permute(0,2,1)).squeeze()
         return x.mean(1)
 """
 class Grader(nn.Module):
