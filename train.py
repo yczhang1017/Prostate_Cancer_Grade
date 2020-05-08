@@ -222,7 +222,11 @@ def main():
                                  map_location=lambda storage, loc: storage))
     
     model.to(device)
-    if args.fp16: toHalf(model)
+    if args.fp16: 
+        model.half()
+        for layer in model.modules():
+            if isinstance(layer, nn.BatchNorm2d):
+                layer.float()
     num_class = np.array(train_csv.groupby('isup_grade').count().image_id)        
     class_weights = np.power(num_class.max()/num_class, 1.)
     print("class weights:",class_weights)

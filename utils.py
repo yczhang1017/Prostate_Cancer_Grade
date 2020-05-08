@@ -127,9 +127,5 @@ class Grader(nn.Module):
         return x
 """    
 
-def toHalf(m):
-    m.half()
-    for layer in m.modules():
-        if isinstance(layer, nn.BatchNorm2d):
-            layer.float()
+
     
