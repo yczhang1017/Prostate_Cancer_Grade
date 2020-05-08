@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 import torch
 from torch import nn
@@ -10,6 +11,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import random 
+if "/usr/local/lib/python3.5/dist-packages" not in sys.path:
+    sys.path+=["/usr/local/lib/python3.5/dist-packages"]
 import openslide
 import skimage.measure
 import PIL
@@ -22,7 +25,7 @@ import torch.optim as optim
 
 from sklearn.metrics import cohen_kappa_score
 from utils import ResGrader, Grader
-import sys
+
 if "over9000" not in sys.path:
     sys.path+=["over9000"]
 from over9000 import Over9000
