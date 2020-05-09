@@ -77,7 +77,7 @@ class Grader(nn.Module):
         self.model = EfficientNet.from_pretrained(arch)
         #self.model._fc = nn.Linear(self.model._fc.in_features, n-1)
         self.act = nn.GELU()
-        self.norm1 = nn.LayerNorm([25,n])
+        self.norm1 = nn.LayerNorm([24,n])
         #encoder_layer  = nn.TransformerEncoderLayer(n, 8)
         #self.attention = nn.TransformerEncoder(encoder_layer, num_layers=1)
         self.fc1 = nn.Linear(n,o)
