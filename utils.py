@@ -52,9 +52,9 @@ class ResGrader(nn.Module):
         self.enc = nn.Sequential(*list(m.children())[:-2])       
         nc = list(m.children())[-1].in_features 
         self.head = nn.Sequential(AdaptiveConcatPool2d(),Flatten())
-        self.head2 = nn.Sequential(nn.Linear(2*nc+1,n),
+        self.head2 = nn.Sequential(nn.Linear(2*nc,n),
                             Mish(),nn.BatchNorm1d(n), nn.Dropout(0.5),nn.Linear(512,o))
-    def forward(self, x, p):
+    def forward(self, x):
         b, n, c, w, h = x.shape
         x = x.view(b*n,c,w,h)
         #x: bs*N x 3 x 128 x 128
@@ -64,7 +64,6 @@ class ResGrader(nn.Module):
         x = x.view(b,n,c,w,h).permute(0,2,1,3,4).contiguous().view(b,c,w*n,h)
         x = self.head(x)
         #x: bs x 2nc 
-        x = torch.cat((x,p),dim=1)
         x = self.head2(x)
         #x: bs x o
         return x
@@ -78,19 +77,17 @@ class Grader(nn.Module):
         self.model = EfficientNet.from_pretrained(arch)
         #self.model._fc = nn.Linear(self.model._fc.in_features, n-1)
         self.act = nn.GELU()
-        self.norm1 = nn.LayerNorm([25,n-1])
+        self.norm1 = nn.LayerNorm([25,n])
         #encoder_layer  = nn.TransformerEncoderLayer(n, 8)
         #self.attention = nn.TransformerEncoder(encoder_layer, num_layers=1)
         self.fc1 = nn.Linear(n,o)
         #self.norm2 = nn.LayerNorm([25,6])
         #self.fc2 = nn.Linear(25,1)
-    def forward(self,x,p): # batch x 17 x size x size x 3
+    def forward(self,x): # batch x 17 x size x size x 3
         b, n, c, w, h = x.shape
-        p = p.expand((b,n)).unsqueeze(-1)
         x = self.model(x.view(b*n, c, w, h))
         x = x.view(b,n,-1)
         x = self.norm1(self.act(x)).view(b,n,-1)
-        x = torch.cat((x,p),dim=-1)
         #x = self.attention(x)
         x = self.fc1(x) # b x 25 x o 
         #x = self.norm2(self.act(x))

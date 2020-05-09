@@ -65,7 +65,7 @@ parser.add_argument('--step', default=2, type=int,
 parser.add_argument('-a','--arch', default='resnext50_32x4d_ssl', choices=['efficientnet-b4', 'resnext50_32x4d_ssl'],
                     help='architecture of EfficientNet')
 parser.add_argument('--data', default=1,type=int)
-parser.add_argument('--fp16', action='store_false')
+parser.add_argument('--fp16', action='store_true')
 
 
 args = parser.parse_args()
@@ -185,9 +185,9 @@ class ProstateData(Dataset):
     
     def __getitem__(self, idx):
         img_id = self.df.iloc[idx].image_id
-        provider = self.df.iloc[idx].data_provider 
-        plab = provider_label[provider]
-        plab =  torch.tensor(plab, dtype=torch.float32, device="cpu") 
+        #provider = self.df.iloc[idx].data_provider 
+        #plab = provider_label[provider]
+        #plab =  torch.tensor(plab, dtype=torch.float32, device="cpu") 
         label = self.df.iloc[idx].isup_grade
         
         images = extract_images(img_id, self.img_dir, self.size, self.mode)
@@ -195,9 +195,9 @@ class ProstateData(Dataset):
                 [self.transform(im).unsqueeze(0) for im in images],
                 dim=0)
         if self.mode == 'train' or self.mode == 'val':
-            return image_tensor, plab, torch.tensor(label, dtype=torch.long, device="cpu")
+            return image_tensor, torch.tensor(label, dtype=torch.long, device="cpu")
         else:
-            return image_tensor, plab
+            return image_tensor#, plab
 
 
     
@@ -207,9 +207,9 @@ def main():
     if args.data==0:
         train_data = train_csv
     elif args.data==1:
-        train_data = (train_csv['data_provider'] == 'karolinska')
+        train_data = train_csv[train_csv['data_provider'] == 'karolinska']
     elif args.data==2:
-        train_data = (train_csv['data_provider'] == 'radboud')
+        train_data = train_csv[train_csv['data_provider'] == 'radboud']
     df['train'], df['val'] = train_test_split(train_data, stratify= train_data.isup_grade, test_size=0.05, random_state=42)
     dataset = {x: ProstateData(df[x], args.root, x, args.size, transform=transform[x]) 
                 for x in ['train', 'val']}
@@ -267,17 +267,16 @@ def main():
             running_loss=0
             preds = None
             truth = None
-            for i, (img, plab, targets) in enumerate(loader[phase]):
+            for i, (img, targets) in enumerate(loader[phase]):
                 img = img.to(device)
                 b, n, _, _, _ = img.shape
-                plab = plab.to(device).unsqueeze(-1)
                 targets= targets.to(device)
                 if args.fp16:
                     img = img.half()
-                    plab = plab.half()
+                    
                 optimizer.zero_grad()
                 with torch.set_grad_enabled(phase == 'train'):
-                    output = model(img, plab)
+                    output = model(img)
                     loss = criterion(output, targets)
                     if phase == 'train':
                         loss.backward()
