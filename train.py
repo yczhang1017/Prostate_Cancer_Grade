@@ -40,13 +40,13 @@ parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
 parser.add_argument('--root', default='..',
                     type=str, help='directory of the data')
-parser.add_argument('--batch_size', default=12, type=int,
+parser.add_argument('--batch_size', default=6, type=int,
                     help='Batch size for training')
 parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
-parser.add_argument('--lr', default=0.001, type=float,
+parser.add_argument('--lr', default=0.01, type=float,
                     help='initial learning rate')
-parser.add_argument('-e','--epochs', default=16, type=int,
+parser.add_argument('-e','--epochs', default=10, type=int,
                     help='number of epochs to train')
 parser.add_argument('-o','--output_folder', default='save/', type=str,
                     help='Dir to save results')
@@ -56,13 +56,13 @@ parser.add_argument('-c','--checkpoint', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('-r','--resume_epoch', default=0, type=int,
                     help='epoch number to be resumed at')
-parser.add_argument('-s','--size', default=128, type=int,
+parser.add_argument('-s','--size', default=192, type=int,
                     help='image size for training, divisible by 64')
 parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
-parser.add_argument('--step', default=4, type=int,
+parser.add_argument('--step', default=2, type=int,
                     help='step to reduce lr')
-parser.add_argument('-a','--arch', default='efficientnet-b4', choices=['efficientnet-b4', 'resnext50_32x4d_swsl'],
+parser.add_argument('-a','--arch', default='efficientnet-b4', #choices=['efficientnet-b4', 'resnext50_32x4d_ssl'],
                     help='architecture of EfficientNet')
 parser.add_argument('--fp16', action='store_false')
 
@@ -129,7 +129,7 @@ def extract_images(img_id, img_dir, size, mode, debug=False):
     w1,h1 = thumbnail.size
     im = PIL.Image.new('RGB',(size,size))
     im.paste(thumbnail, (random.randrange(size+1-w1), random.randrange(size+1-h1)))
-    num =  {32:24}
+    num =  {16:8,32:8,64:8}
     images = [im]
     if debug:
         fig,ax = plt.subplots(1)
