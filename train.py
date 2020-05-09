@@ -64,6 +64,7 @@ parser.add_argument('--step', default=2, type=int,
                     help='step to reduce lr')
 parser.add_argument('-a','--arch', default='resnext50_32x4d_swsl', choices=['efficientnet-b4', 'resnext50_32x4d_swsl'],
                     help='architecture of EfficientNet')
+parser.add_argument('--data', default=1,type=int)
 parser.add_argument('--fp16', action='store_false')
 
 
@@ -203,7 +204,13 @@ class ProstateData(Dataset):
 def main():
     train_csv = pd.read_csv(os.path.join(args.root, "train.csv"))
     df = {}
-    df['train'], df['val'] = train_test_split(train_csv, stratify= train_csv.isup_grade, test_size=0.05, random_state=42)
+    if args.data==0:
+        train_data = train_csv
+    elif args.data==1:
+        train_data = (train_csv['data_provider'] == 'karolinska')
+    elif args.data==2:
+        train_data = (train_csv['data_provider'] == 'radboud')
+    df['train'], df['val'] = train_test_split(train_data, stratify= train_data.isup_grade, test_size=0.05, random_state=42)
     dataset = {x: ProstateData(df[x], args.root, x, args.size, transform=transform[x]) 
                 for x in ['train', 'val']}
     loader={x: DataLoader(dataset[x],
@@ -234,7 +241,7 @@ def main():
         for layer in model.modules():
             if isinstance(layer, nn.BatchNorm2d):
                 layer.float()
-    num_class = np.array(train_csv.groupby('isup_grade').count().image_id)        
+    num_class = np.array(train_data.groupby('isup_grade').count().image_id)        
     class_weights = np.power(num_class.max()/num_class, 1.)
     print("class weights:",class_weights)
     class_weights = torch.tensor(class_weights, dtype=wtype, device=device)
