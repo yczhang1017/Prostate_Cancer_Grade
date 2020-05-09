@@ -71,7 +71,7 @@ class ResGrader(nn.Module):
         
 
 class Grader(nn.Module):
-    def __init__(self, arch, n=1001, o=nlabel):
+    def __init__(self, arch, n=1000, o=nlabel):
         super(Grader, self).__init__()
         self.n = n
         self.model = EfficientNet.from_pretrained(arch)
