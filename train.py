@@ -40,13 +40,13 @@ parser = argparse.ArgumentParser(
     description='Prostate Cancer Grader')
 parser.add_argument('--root', default='..',
                     type=str, help='directory of the data')
-parser.add_argument('--batch_size', default=6, type=int,
+parser.add_argument('--batch_size', default=16, type=int,
                     help='Batch size for training')
 parser.add_argument('-w','--workers', default=4, type=int,
                     help='Number of workers used in dataloading')
-parser.add_argument('--lr', default=0.001, type=float,
+parser.add_argument('--lr', default=0.01, type=float,
                     help='initial learning rate')
-parser.add_argument('-e','--epochs', default=16, type=int,
+parser.add_argument('-e','--epochs', default=10, type=int,
                     help='number of epochs to train')
 parser.add_argument('-o','--output_folder', default='save/', type=str,
                     help='Dir to save results')
@@ -60,9 +60,9 @@ parser.add_argument('-s','--size', default=192, type=int,
                     help='image size for training, divisible by 64')
 parser.add_argument('-ls','--log_step', default=10, type=int,
                     help='number of steps to print log')
-parser.add_argument('--step', default=4, type=int,
+parser.add_argument('--step', default=2, type=int,
                     help='step to reduce lr')
-parser.add_argument('-a','--arch', default='efficientnet-b4', choices=['efficientnet-b4', 'resnext50_32x4d_swsl'],
+parser.add_argument('-a','--arch', default='resnext50_32x4d_swsl', choices=['efficientnet-b4', 'resnext50_32x4d_swsl'],
                     help='architecture of EfficientNet')
 parser.add_argument('--fp16', action='store_false')
 
@@ -237,8 +237,8 @@ def main():
     print("class weights:",class_weights)
     class_weights = torch.tensor(class_weights, dtype=wtype, device=device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
-    optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
-    #optimizer = Over9000(model.parameters(), lr=args.lr)
+    #optimizer = torch.optim.SGD(model.parameters(),lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
+    optimizer = Over9000(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step, gamma=0.1)
     for i in range(args.resume_epoch):
         scheduler.step()
